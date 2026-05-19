@@ -29,6 +29,8 @@ The portal migration adds:
 - `job_posts_fts`, an SQLite FTS5 index over the crawler-owned `job_posts` table
 - triggers to keep the FTS table current as jobs are inserted or updated
 
+Phoenix uses `portal_schema_migrations` for its migration bookkeeping. This avoids colliding with the Rails crawler's `schema_migrations` table, which has a different schema.
+
 ## Setup
 
 ```sh

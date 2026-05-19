@@ -7,6 +7,7 @@ import Config
 # Run `mix help test` for more information.
 config :portal, Portal.Repo,
   database: Path.expand("../portal_test.db", __DIR__),
+  migration_source: "portal_schema_migrations",
   pool_size: 5,
   pool: Ecto.Adapters.SQL.Sandbox
 

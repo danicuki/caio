@@ -3,6 +3,7 @@ import Config
 # Configure your database
 config :portal, Portal.Repo,
   database: Path.expand("../../crawler/db/development.sqlite3", __DIR__),
+  migration_source: "portal_schema_migrations",
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
