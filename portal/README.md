@@ -1,6 +1,6 @@
-# SignalJobs Portal
+# Caio Portal
 
-Phoenix web app for searching the job index produced by the SignalJobs crawler.
+Phoenix web app for searching the job index produced by the Caio crawler.
 
 The portal is intentionally light: server-rendered Phoenix pages, minimal JavaScript, mobile-first CSS, and direct SQLite reads during local development.
 
@@ -55,4 +55,3 @@ mix assets.build
 ## Product Notes
 
 Keep the unlock flow transparent. Users should understand that providing contact details creates a free profile, unlocks unlimited results, and may be used for relevant job-search help when they opt in.
-

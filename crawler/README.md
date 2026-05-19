@@ -1,8 +1,8 @@
-# SignalJobs Crawler
+# Caio Crawler
 
 Rails and Sidekiq ingestion system for collecting public tech job postings into a normalized SQLite database.
 
-The crawler is built as the ingestion half of the SignalJobs monorepo. It handles source fanout, source-specific fetches, deduplication, location/salary normalization, and write-side persistence into `job_posts`.
+The crawler is built as the ingestion half of the Caio monorepo. It handles source fanout, source-specific fetches, deduplication, location/salary normalization, and write-side persistence into `job_posts`.
 
 ## Core Responsibilities
 
@@ -113,4 +113,3 @@ It is intentionally ignored by git. The portal reads this same database during l
 - Keep generated databases, WAL files, logs, and large location indexes out of git.
 - Prefer adding source-specific adapters over one-off scraping code.
 - Store enough cursor state to resume safely after crashes or restarts.
-

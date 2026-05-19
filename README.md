@@ -1,6 +1,6 @@
-# SignalJobs
+# Caio
 
-SignalJobs is a monorepo for a high-volume tech jobs search product. It has two apps:
+Caio is a monorepo for a high-volume tech jobs search product. It has two apps:
 
 - `crawler/`: Ruby on Rails plus Sidekiq workers that collect, normalize, deduplicate, and store public job postings.
 - `portal/`: Phoenix/Elixir web app that reads the crawler database and gives developers a fast mobile-first search experience.
@@ -65,4 +65,3 @@ The repository ignores runtime databases, Sidekiq/Rails logs, Phoenix build outp
 - Optional LinkedIn URL capture.
 - Apply-click tracking through `job_interests`.
 - Mobile-first, low-JS Phoenix pages.
-
