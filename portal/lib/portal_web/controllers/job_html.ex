@@ -110,12 +110,19 @@ defmodule PortalWeb.JobHTML do
     text
     |> to_string()
     |> decode_html_entities()
+    |> normalize_breaks()
     |> sanitize_description_html()
     |> normalize_description_html()
     |> case do
       "" -> description_html(nil)
       value -> value
     end
+  end
+
+  defp normalize_breaks(text) do
+    text
+    |> String.replace(~r/(?:<\s*br\s*\/?\s*>\s*){2,}/i, "</p><p>")
+    |> String.replace(~r/<\s*br\s*\/?\s*>/i, "<br>")
   end
 
   defp sanitize_description_html(text) do
@@ -156,6 +163,8 @@ defmodule PortalWeb.JobHTML do
     |> String.replace(~r/\r\n?/, "\n")
     |> String.replace(~r/[ \t]+/, " ")
     |> String.replace(~r/\n{3,}/, "\n\n")
+    |> String.replace(~r/<p>\s*(<(?:ul|ol)\b)/i, "\\1")
+    |> String.replace(~r{(</(?:ul|ol)>)\s*</p>}i, "\\1")
     |> String.trim()
     |> wrap_plain_description()
   end

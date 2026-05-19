@@ -1097,10 +1097,14 @@ module Standalone
             source_url: job.dig("refs", "landing_page"),
             published_at: parse_time(job["publication_date"]),
             tags: job["tags"] || [],
-            description: text(job["contents"]),
+            description: themuse_description(job),
             raw: job
           }
         end
+      end
+
+      def themuse_description(job)
+        job["contents"].to_s.strip
       end
     end
 
