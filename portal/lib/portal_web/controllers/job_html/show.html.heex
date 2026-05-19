@@ -22,7 +22,9 @@
 
     <section class="description-block">
       <h2>Indexed description</h2>
-      <p>{clean_description(@job.description)}</p>
+      <div class="description-body">
+        {raw(description_html(@job.description))}
+      </div>
     </section>
 
     <%= unless @lead do %>

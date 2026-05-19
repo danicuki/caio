@@ -612,12 +612,48 @@ input {
   font-size: 18px;
 }
 
-.description-block p {
+.description-body {
   margin: 0;
   color: #374151;
   font-size: 16px;
   line-height: 1.65;
-  white-space: pre-line;
+}
+
+.description-body p,
+.description-body ul,
+.description-body ol,
+.description-body blockquote {
+  margin: 0 0 16px;
+}
+
+.description-body h2,
+.description-body h3,
+.description-body h4 {
+  margin: 24px 0 10px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.description-body ul,
+.description-body ol {
+  padding-left: 22px;
+}
+
+.description-body li {
+  margin: 6px 0;
+}
+
+.description-body strong,
+.description-body b {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.description-body blockquote {
+  padding-left: 14px;
+  border-left: 3px solid #b7d9d1;
+  color: #475467;
 }
 
 .detail-unlock {
