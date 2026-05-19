@@ -144,7 +144,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -273,6 +274,7 @@ input {
 
 .search-panel input,
 .stack-form input,
+.stack-form select,
 .lead-form input {
   width: 100%;
   min-height: 44px;
@@ -286,6 +288,7 @@ input {
 
 .search-panel input:focus,
 .stack-form input:focus,
+.stack-form select:focus,
 .lead-form input:focus {
   border-color: var(--green);
   box-shadow: 0 0 0 3px rgb(15 118 110 / 14%);

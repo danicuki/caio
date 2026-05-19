@@ -15,7 +15,7 @@ defmodule Portal.Jobs do
 
     JobPost
     |> base_filters(params)
-    |> order_by([j], desc: coalesce(j.published_at, j.updated_at), desc: j.id)
+    |> apply_order(params)
     |> limit(^limit)
     |> Repo.all()
   end
@@ -33,7 +33,16 @@ defmodule Portal.Jobs do
     query
     |> text_search(params["q"])
     |> like_filter(:title, params["role"])
+    |> like_filter(:company, params["company"])
     |> location_filter(params["location"])
+  end
+
+  defp apply_order(query, %{"order" => "random"}) do
+    order_by(query, [j], fragment("random()"))
+  end
+
+  defp apply_order(query, _params) do
+    order_by(query, [j], desc: coalesce(j.published_at, j.updated_at), desc: j.id)
   end
 
   defp text_search(query, value) when is_binary(value) do

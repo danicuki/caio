@@ -35,6 +35,22 @@
             placeholder="remote, London, US"
           />
         </label>
+        <label>
+          <span>Company</span>
+          <input
+            name="company"
+            type="search"
+            value={@params["company"]}
+            placeholder="stripe, figma, openai"
+          />
+        </label>
+        <label>
+          <span>Order</span>
+          <select name="order">
+            <option value="recent" selected={@params["order"] != "random"}>Newest first</option>
+            <option value="random" selected={@params["order"] == "random"}>Random mix</option>
+          </select>
+        </label>
         <button type="submit">Search</button>
       </form>
 
