@@ -1,0 +1,3 @@
+:concurrency: <%= ENV.fetch("SIDEKIQ_SOURCE_CONCURRENCY", 20) %>
+:queues:
+  - source_fetchers

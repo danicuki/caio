@@ -1,0 +1,3 @@
+class SourceRun < ApplicationRecord
+end
+

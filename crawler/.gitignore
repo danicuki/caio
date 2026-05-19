@@ -1,0 +1,11 @@
+/log/*
+/tmp/*
+/storage/*
+/db/*.sqlite3
+/db/*.sqlite3-*
+/db/*.db
+/db/*.db-*
+/.bundle
+/vendor/bundle
+/data/json-cities.json
+/data/location_index.json

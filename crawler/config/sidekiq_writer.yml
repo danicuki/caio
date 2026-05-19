@@ -1,0 +1,3 @@
+:concurrency: <%= ENV.fetch("SIDEKIQ_WRITER_CONCURRENCY", 1) %>
+:queues:
+  - job_writes

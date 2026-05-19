@@ -1,0 +1,47 @@
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Runtime logs and temp files
+*.log
+tmp/
+log/
+
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Ruby/Rails crawler runtime
+crawler/.bundle/
+crawler/vendor/bundle/
+crawler/log/
+crawler/tmp/
+crawler/storage/
+crawler/db/*.sqlite3
+crawler/db/*.sqlite3-*
+crawler/db/*.db
+crawler/db/*.db-*
+
+# Large generated/reference data. Rebuild locally when needed.
+crawler/data/json-cities.json
+crawler/data/location_index.json
+
+# Elixir/Phoenix build output
+portal/_build/
+portal/deps/
+portal/cover/
+portal/doc/
+portal/.elixir_ls/
+portal/erl_crash.dump
+portal/*.ez
+portal/portal-*.tar
+portal/priv/static/assets/
+portal/priv/static/cache_manifest.json
+portal/assets/node_modules/
+portal/npm-debug.log
+portal/*.db
+portal/*.db-*
+

@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/standalone/job_api_batch"
+
+db_path = ENV.fetch("JOB_CRAWLER_DB", File.expand_path("../db/development.sqlite3", __dir__))
+runner = Standalone::Runner.new(db_path: db_path)
+
+case ARGV.fetch(0, "crawl")
+when "crawl"
+  runner.crawl(source_names: ARGV[1..])
+when "forever"
+  runner.forever(source_names: ARGV[1..])
+when "stats"
+  runner.stats
+when "list"
+  runner.list(limit: ARGV.fetch(1, "20"))
+when "normalize"
+  runner.normalize
+else
+  warn "Usage: ruby bin/local_crawl [crawl|forever|stats|list|normalize]"
+  exit 1
+end

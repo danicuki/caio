@@ -1,0 +1,15 @@
+source "https://rubygems.org"
+
+ruby "3.4.8"
+
+gem "rails", "~> 8.1"
+gem "sqlite3", "~> 2.7"
+gem "puma", ">= 6.0"
+gem "sidekiq", "~> 8.0"
+gem "faraday", "~> 2.14"
+gem "nokogiri", "~> 1.18"
+gem "csv", "~> 3.3"
+
+group :development, :test do
+  gem "debug", platforms: %i[mri windows]
+end

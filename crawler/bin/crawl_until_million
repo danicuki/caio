@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export TARGET_JOBS="${TARGET_JOBS:-1000000}"
+bundle exec rails crawler:crawl_until_target
+
