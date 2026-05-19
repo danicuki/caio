@@ -63,7 +63,6 @@ module Standalone
               employment_type = excluded.employment_type,
               category = excluded.category,
               salary = excluded.salary,
-              source_url = excluded.source_url,
               published_at = excluded.published_at,
               tags_json = excluded.tags_json,
               description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
@@ -77,7 +76,6 @@ module Standalone
               location_country = excluded.location_country,
               location_continent = excluded.location_continent,
               location_scope = excluded.location_scope,
-              source_url = excluded.source_url,
               updated_at = excluded.updated_at
             ON CONFLICT(source_url) DO UPDATE SET
               title = excluded.title,
@@ -135,7 +133,6 @@ module Standalone
           employment_type = excluded.employment_type,
           category = excluded.category,
           salary = excluded.salary,
-          source_url = excluded.source_url,
           published_at = excluded.published_at,
           tags_json = excluded.tags_json,
           description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
@@ -149,7 +146,6 @@ module Standalone
           location_country = excluded.location_country,
           location_continent = excluded.location_continent,
           location_scope = excluded.location_scope,
-          source_url = excluded.source_url,
           updated_at = excluded.updated_at
         ON CONFLICT(source_url) DO UPDATE SET
           title = excluded.title,
