@@ -1,0 +1,79 @@
+<main class="site-shell">
+  <nav class="topbar compact">
+    <a href={~p"/"} class="brand">SignalJobs</a>
+    <span class="nav-muted">{@total} matching jobs</span>
+  </nav>
+
+  <section class="results-layout">
+    <aside class="filter-panel">
+      <h1>Search jobs</h1>
+      <form action={~p"/jobs"} method="get" class="stack-form">
+        <label>
+          <span>Keyword</span>
+          <input
+            name="q"
+            type="search"
+            value={@params["q"]}
+            placeholder="kubernetes, phoenix, designer"
+          />
+        </label>
+        <label>
+          <span>Role</span>
+          <input
+            name="role"
+            type="search"
+            value={@params["role"]}
+            placeholder="software engineer"
+          />
+        </label>
+        <label>
+          <span>Location</span>
+          <input
+            name="location"
+            type="search"
+            value={@params["location"]}
+            placeholder="remote, London, US"
+          />
+        </label>
+        <button type="submit">Search</button>
+      </form>
+
+      <%= if @unlocked? do %>
+        <div class="unlock-box success">
+          <strong>Unlimited search active</strong>
+          <span>{@lead.email}</span>
+        </div>
+      <% else %>
+        <div class="unlock-box">
+          <strong>Unlock unlimited results</strong>
+          <p>
+            Preview 10 jobs now. Create a free profile to see every match and save your search signal.
+          </p>
+          <.lead_form return_to={Phoenix.Controller.current_path(@conn)} params={@params} />
+        </div>
+      <% end %>
+    </aside>
+
+    <section class="job-results">
+      <div class="results-heading">
+        <h2>Best matches</h2>
+        <span>Updated from crawler index</span>
+      </div>
+
+      <%= for {job, index} <- Enum.with_index(@jobs) do %>
+        <%= if @unlocked? or index < @guest_limit do %>
+          <.job_card job={job} />
+        <% else %>
+          <div class="job-card locked-card">
+            <div>
+              <p class="source-pill">Locked match</p>
+              <h3>Senior role at a verified tech company</h3>
+              <p>Location, salary and apply link available after free unlock.</p>
+            </div>
+            <a href="#unlock" class="soft-button">Unlock</a>
+          </div>
+        <% end %>
+      <% end %>
+    </section>
+  </section>
+</main>

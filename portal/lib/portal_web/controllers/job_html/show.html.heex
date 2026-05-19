@@ -1,0 +1,38 @@
+<main class="site-shell narrow">
+  <nav class="topbar compact">
+    <a href={~p"/jobs"} class="nav-link">← Back to search</a>
+    <a href={~p"/"} class="brand">SignalJobs</a>
+  </nav>
+
+  <article class="job-detail">
+    <p class="source-pill">{source_label(@job.source)}</p>
+    <h1>{@job.title}</h1>
+    <p class="detail-meta">
+      <strong>{@job.company || "Company"}</strong>
+      <span>{compact_location(@job)}</span>
+      <%= if salary(@job) do %>
+        <span>{salary(@job)}</span>
+      <% end %>
+    </p>
+
+    <form action={~p"/jobs/#{@job.id}/apply"} method="post">
+      <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+      <button class="apply-button" type="submit">Apply to job</button>
+    </form>
+
+    <section class="description-block">
+      <h2>Indexed description</h2>
+      <p>{clean_description(@job.description)}</p>
+    </section>
+
+    <%= unless @lead do %>
+      <section class="unlock-box detail-unlock">
+        <strong>Want unlimited search?</strong>
+        <p>
+          Create a free profile to unlock all search results and receive relevant job-search help.
+        </p>
+        <.lead_form return_to={~p"/jobs/#{@job.id}"} params={%{}} />
+      </section>
+    <% end %>
+  </article>
+</main>

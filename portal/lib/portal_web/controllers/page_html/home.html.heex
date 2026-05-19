@@ -1,0 +1,49 @@
+<main class="site-shell">
+  <section class="hero-band">
+    <nav class="topbar">
+      <a href={~p"/"} class="brand">SignalJobs</a>
+      <a href={~p"/jobs"} class="nav-link">Browse jobs</a>
+    </nav>
+
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Fast search across global tech roles</p>
+        <h1>Find the role that is still worth applying to.</h1>
+        <p class="hero-subtitle">
+          Search indexed jobs from public boards, company career pages, and ATS feeds with normalized location and salary data.
+        </p>
+
+        <form action={~p"/jobs"} method="get" class="search-panel">
+          <label>
+            <span>Role or keyword</span>
+            <input name="q" type="search" placeholder="backend, elixir, data, devops" />
+          </label>
+          <label>
+            <span>Location</span>
+            <input name="location" type="search" placeholder="Lisbon, remote, Europe" />
+          </label>
+          <button type="submit">Search jobs</button>
+        </form>
+
+        <p class="privacy-note">
+          Free search preview. Create a free profile to unlock unlimited results and receive relevant job-search help.
+        </p>
+      </div>
+
+      <div class="hero-proof" aria-label="Job search snapshot">
+        <div class="stat-line">
+          <strong>{length(@sample_jobs)} live examples</strong>
+          <span>from the current index</span>
+        </div>
+        <div class="mini-list">
+          <%= for job <- @sample_jobs do %>
+            <a href={~p"/jobs/#{job.id}"} class="mini-job">
+              <strong>{job.title}</strong>
+              <span>{job.company || "Company"} · {PortalWeb.JobHTML.compact_location(job)}</span>
+            </a>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
