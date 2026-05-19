@@ -8,6 +8,12 @@ require "shellwords"
 require "time"
 require "uri"
 
+begin
+  require "sqlite3"
+rescue LoadError
+  nil
+end
+
 module Standalone
   USER_AGENT = "TechJobsCrawler/0.1 (+local development; contact: jobs@example.invalid)".freeze
 
@@ -22,6 +28,8 @@ module Standalone
 
     def upsert_jobs(source_name, jobs)
       return 0 if jobs.empty?
+
+      return upsert_jobs_native(source_name, jobs) if defined?(SQLite3::Database)
 
       jobs.each_slice(100) do |batch|
         now = Time.now.utc.iso8601
@@ -58,8 +66,8 @@ module Standalone
               source_url = excluded.source_url,
               published_at = excluded.published_at,
               tags_json = excluded.tags_json,
-              description = excluded.description,
-              raw_json = excluded.raw_json,
+              description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
+              raw_json = COALESCE(NULLIF(excluded.raw_json, ''), job_posts.raw_json),
               salary_min = excluded.salary_min,
               salary_max = excluded.salary_max,
               salary_currency = excluded.salary_currency,
@@ -81,8 +89,8 @@ module Standalone
               salary = excluded.salary,
               published_at = excluded.published_at,
               tags_json = excluded.tags_json,
-              description = excluded.description,
-              raw_json = excluded.raw_json,
+              description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
+              raw_json = COALESCE(NULLIF(excluded.raw_json, ''), job_posts.raw_json),
               salary_min = excluded.salary_min,
               salary_max = excluded.salary_max,
               salary_currency = excluded.salary_currency,
@@ -100,6 +108,114 @@ module Standalone
       end
 
       jobs.size
+    end
+
+    def upsert_jobs_native(source_name, jobs)
+      now = Time.now.utc.iso8601
+      db = SQLite3::Database.new(@path)
+      db.busy_timeout = Integer(ENV.fetch("SQLITE_BUSY_TIMEOUT_MS", "15000"))
+      db.execute("PRAGMA journal_mode = WAL")
+      db.execute("PRAGMA synchronous = NORMAL")
+
+      sql = <<~SQL
+        INSERT INTO job_posts (
+          source, source_key, title, company, location, remote, employment_type,
+          category, salary, source_url, published_at, tags_json, description,
+          raw_json, salary_min, salary_max, salary_currency, salary_period,
+          location_city, location_state, location_country, location_continent,
+          location_scope, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON CONFLICT(source, source_key) DO UPDATE SET
+          title = excluded.title,
+          company = excluded.company,
+          location = excluded.location,
+          remote = excluded.remote,
+          employment_type = excluded.employment_type,
+          category = excluded.category,
+          salary = excluded.salary,
+          source_url = excluded.source_url,
+          published_at = excluded.published_at,
+          tags_json = excluded.tags_json,
+          description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
+          raw_json = COALESCE(NULLIF(excluded.raw_json, ''), job_posts.raw_json),
+          salary_min = excluded.salary_min,
+          salary_max = excluded.salary_max,
+          salary_currency = excluded.salary_currency,
+          salary_period = excluded.salary_period,
+          location_city = excluded.location_city,
+          location_state = excluded.location_state,
+          location_country = excluded.location_country,
+          location_continent = excluded.location_continent,
+          location_scope = excluded.location_scope,
+          source_url = excluded.source_url,
+          updated_at = excluded.updated_at
+        ON CONFLICT(source_url) DO UPDATE SET
+          title = excluded.title,
+          company = excluded.company,
+          location = excluded.location,
+          remote = excluded.remote,
+          employment_type = excluded.employment_type,
+          category = excluded.category,
+          salary = excluded.salary,
+          published_at = excluded.published_at,
+          tags_json = excluded.tags_json,
+          description = COALESCE(NULLIF(excluded.description, ''), job_posts.description),
+          raw_json = COALESCE(NULLIF(excluded.raw_json, ''), job_posts.raw_json),
+          salary_min = excluded.salary_min,
+          salary_max = excluded.salary_max,
+          salary_currency = excluded.salary_currency,
+          salary_period = excluded.salary_period,
+          location_city = excluded.location_city,
+          location_state = excluded.location_state,
+          location_country = excluded.location_country,
+          location_continent = excluded.location_continent,
+          location_scope = excluded.location_scope,
+          updated_at = excluded.updated_at
+      SQL
+
+      db.transaction do
+        statement = db.prepare(sql)
+        jobs.each do |job|
+          normalized = Normalizer.normalize(job)
+          statement.execute(
+            source_name,
+            job.fetch(:source_key),
+            job.fetch(:title),
+            job[:company],
+            job[:location],
+            native_boolean(job[:remote]),
+            job[:employment_type],
+            job[:category],
+            job[:salary],
+            job.fetch(:source_url),
+            job[:published_at],
+            JSON.generate(job[:tags] || []),
+            job[:description],
+            JSON.generate(job[:raw]),
+            normalized[:salary_min],
+            normalized[:salary_max],
+            normalized[:salary_currency],
+            normalized[:salary_period],
+            normalized[:location_city],
+            normalized[:location_state],
+            normalized[:location_country],
+            normalized[:location_continent],
+            normalized[:location_scope],
+            now,
+            now
+          )
+        end
+      end
+      jobs.size
+    ensure
+      begin
+        statement&.close
+      rescue StandardError
+        nil
+      end
+      db&.close
     end
 
     def record_run(source_name, fetched_count, imported_count, status: "succeeded", error_message: nil)
@@ -218,6 +334,7 @@ module Standalone
         CREATE INDEX IF NOT EXISTS index_job_posts_location ON job_posts(location);
         CREATE INDEX IF NOT EXISTS index_job_posts_remote ON job_posts(remote);
         CREATE INDEX IF NOT EXISTS index_job_posts_category ON job_posts(category);
+        CREATE UNIQUE INDEX IF NOT EXISTS index_job_posts_source_url_unique ON job_posts(source_url);
 
         CREATE TABLE IF NOT EXISTS source_runs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -285,6 +402,12 @@ module Standalone
       return "NULL" if value.nil?
 
       value ? "1" : "0"
+    end
+
+    def native_boolean(value)
+      return nil if value.nil?
+
+      value ? 1 : 0
     end
   end
 

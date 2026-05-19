@@ -1,4 +1,5 @@
 require Rails.root.join("lib/standalone/job_api_batch")
+require "set"
 
 class SourceFanoutWorker
   include Sidekiq::Job
@@ -44,6 +45,7 @@ class SourceFanoutWorker
     enqueue_static_sources
     enqueue_jobicy
     enqueue_company_boards
+    enqueue_company_name_ats_probes
     enqueue_new_ats_sources
     enqueue_paged_sources
   end
@@ -95,6 +97,26 @@ class SourceFanoutWorker
     end
   end
 
+  def enqueue_company_name_ats_probes
+    candidates = company_name_candidates
+    return if candidates.empty?
+
+    limit = Integer(ENV.fetch("ATS_PROBE_COMPANIES_PER_RUN", "150"))
+    state = SourceState.find_or_initialize_by(source: "ats_probe_company_cursor")
+    cursor = state.next_cursor.to_i
+    window = candidates.rotate(cursor).first(limit)
+
+    window.each do |candidate|
+      enqueue_ats_probe_candidate(candidate)
+    end
+
+    state.next_cursor = ((cursor + window.length) % candidates.length).to_s
+    state.exhausted = false
+    state.last_error = nil
+    state.updated_at = Time.current
+    state.save!
+  end
+
   def enqueue_paged_sources
     Integer(ENV.fetch("ARBEITNOW_SOURCE_PAGES", "250")).times do |index|
       StandaloneSourceFetchWorker.perform_async("arbeitnow", { "page" => index + 1 })
@@ -113,6 +135,63 @@ class SourceFanoutWorker
     Integer(ENV.fetch("HIMALAYAS_SOURCE_PAGES", "500")).times do |index|
       StandaloneSourceFetchWorker.perform_async("himalayas", { "offset" => index * 20 })
     end
+  end
+
+  def enqueue_ats_probe_candidate(candidate)
+    slug = candidate.fetch(:slug)
+    compact = candidate.fetch(:compact)
+    camel = candidate.fetch(:camel)
+
+    StandaloneSourceFetchWorker.perform_async("greenhouse", { "board" => slug })
+    StandaloneSourceFetchWorker.perform_async("lever", { "company" => slug })
+    StandaloneSourceFetchWorker.perform_async("ashby", { "org" => slug })
+    StandaloneSourceFetchWorker.perform_async("recruitee", { "company" => slug })
+    StandaloneSourceFetchWorker.perform_async("workable", { "account" => slug })
+    StandaloneSourceFetchWorker.perform_async("smartrecruiters", { "company" => compact, "offset" => 0 })
+    StandaloneSourceFetchWorker.perform_async("smartrecruiters", { "company" => camel, "offset" => 0 }) if camel != compact
+  end
+
+  def company_name_candidates
+    JobPost
+      .where.not(company: nil)
+      .group(:company)
+      .order(Arel.sql("COUNT(*) DESC"))
+      .limit(Integer(ENV.fetch("ATS_PROBE_COMPANY_POOL", "5000")))
+      .count
+      .keys
+      .filter_map { |company| company_candidate(company) }
+      .uniq { |candidate| candidate[:slug] }
+      .reject { |candidate| known_candidate_slug?(candidate[:slug]) }
+  end
+
+  def company_candidate(company)
+    clean = company.to_s
+      .gsub(/\b(inc|incorporated|llc|ltd|limited|gmbh|ag|sa|s\.a\.|plc|corp|corporation|co|company)\b\.?/i, " ")
+      .gsub(/[^[:alnum:]\s]/, " ")
+      .gsub(/\s+/, " ")
+      .strip
+    return nil if clean.length < 3
+
+    words = clean.split
+    slug = words.join("-").downcase
+    compact = words.join
+    camel = words.map { |word| word[0].to_s.upcase + word[1..].to_s.downcase }.join
+    { slug: slug, compact: compact, camel: camel }
+  end
+
+  def known_candidate_slug?(slug)
+    static_slugs.include?(slug)
+  end
+
+  def static_slugs
+    @static_slugs ||= (
+      greenhouse_boards +
+      lever_companies +
+      ashby_orgs +
+      recruitee_companies +
+      workable_accounts +
+      smartrecruiters_companies.map(&:downcase)
+    ).map(&:downcase).to_set
   end
 
   def greenhouse_boards

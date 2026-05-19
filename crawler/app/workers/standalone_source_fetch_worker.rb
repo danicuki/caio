@@ -65,24 +65,51 @@ class StandaloneSourceFetchWorker
     payload = http_client.get_json(url)
     postings = Array(payload["content"])
 
-    postings.map do |job|
+    detail_limit = Integer(ENV.fetch("SMARTRECRUITERS_DETAILS_PER_PAGE", "25"))
+
+    postings.each_with_index.map do |job, index|
+      detail = index < detail_limit ? smartrecruiters_detail(company, job["id"]) : {}
       location = job["location"]
-      location_text = location.is_a?(Hash) ? [location["city"], location["region"], location["country"]].compact.join(", ") : nil
+      location = detail["location"] if detail["location"].is_a?(Hash)
+      location_text = location.is_a?(Hash) ? [location["fullLocation"], location["city"], location["region"], location["country"]].compact.find(&:present?) : nil
       {
         source_key: "#{company}:#{job.fetch("id")}",
-        title: job.fetch("name"),
-        company: company,
+        title: detail["name"] || job.fetch("name"),
+        company: detail.dig("company", "name") || company,
         location: location_text,
-        remote: job.to_s.match?(/remote/i) ? true : nil,
-        employment_type: job.dig("typeOfEmployment", "label"),
-        category: job.dig("function", "label"),
-        source_url: job["ref"] || job["applyUrl"] || "https://jobs.smartrecruiters.com/#{company}/#{job["id"]}",
-        published_at: parse_time(job["releasedDate"]),
-        tags: [job.dig("function", "label"), job.dig("industry", "label")].compact,
-        description: nil,
-        raw: job.merge("smartrecruiters_company" => company)
+        remote: location.to_s.match?(/remote/i) || detail.to_s.match?(/remote/i) ? true : nil,
+        employment_type: detail.dig("typeOfEmployment", "label") || job.dig("typeOfEmployment", "label"),
+        category: detail.dig("function", "label") || job.dig("function", "label"),
+        source_url: detail["postingUrl"] || detail["applyUrl"] || job["ref"] || job["applyUrl"] || "https://jobs.smartrecruiters.com/#{company}/#{job["id"]}",
+        published_at: parse_time(detail["releasedDate"] || job["releasedDate"]),
+        tags: [detail.dig("function", "label"), detail.dig("industry", "label"), job.dig("function", "label"), job.dig("industry", "label")].compact.uniq,
+        description: smartrecruiters_description(detail),
+        raw: job.merge(detail).merge("smartrecruiters_company" => company)
       }
     end
+  end
+
+  def smartrecruiters_detail(company, id)
+    return {} if id.blank?
+    return {} unless ENV.fetch("SMARTRECRUITERS_FETCH_DETAILS", "true") == "true"
+
+    http_client.get_json("https://api.smartrecruiters.com/v1/companies/#{company}/postings/#{id}")
+  rescue StandardError => e
+    warn "smartrecruiters detail failed company=#{company.inspect} id=#{id.inspect}: #{e.class}: #{e.message}"
+    {}
+  end
+
+  def smartrecruiters_description(detail)
+    sections = detail.dig("jobAd", "sections")
+    return nil unless sections.is_a?(Hash)
+
+    sections.values.filter_map do |section|
+      text = section["text"].to_s.strip
+      next if text.empty?
+
+      title = section["title"].to_s.strip
+      title.empty? ? text : "<h3>#{escape_html(title)}</h3>#{text}"
+    end.join("\n")
   end
 
   def fetch_recruitee(company)
@@ -148,5 +175,14 @@ class StandaloneSourceFetchWorker
 
   def strip_html(value)
     value.to_s.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+  end
+
+  def escape_html(value)
+    value.to_s
+      .gsub("&", "&amp;")
+      .gsub("<", "&lt;")
+      .gsub(">", "&gt;")
+      .gsub('"', "&quot;")
+      .gsub("'", "&#39;")
   end
 end
