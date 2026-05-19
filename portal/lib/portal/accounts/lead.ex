@@ -9,7 +9,7 @@ defmodule Portal.Accounts.Lead do
     field :target_location, :string
     field :consent_job_help, :boolean, default: false
 
-    timestamps(type: :utc_datetime)
+    timestamps(inserted_at: :created_at, type: :utc_datetime)
   end
 
   def changeset(lead, attrs) do
