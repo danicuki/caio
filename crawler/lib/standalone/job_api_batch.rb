@@ -1835,12 +1835,27 @@ module Standalone
         []
       end
 
-      def http_get(url)
+      def fetch_detail_description(id)
+        url = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/#{id}"
+        html = http_get(url, referer: "https://www.linkedin.com/jobs/view/#{id}/", browser: true)
+        description = html[%r{<div class="show-more-less-html__markup[^"]*"[^>]*>(.*?)</div>}m, 1]
+        description = html[%r{<section class="show-more-less-html"[^>]*>.*?<div[^>]*>(.*?)</div>}m, 1] if description.to_s.empty?
+        cleaned = html_decode(description.to_s).strip
+        cleaned.empty? ? nil : cleaned
+      rescue StandardError => e
+        raise RateLimited, e.message if e.message.include?("HTTP 429")
+
+        warn "linkedin detail failed id=#{id.inspect}: #{e.message}"
+        nil
+      end
+
+      def http_get(url, referer: nil, browser: false)
         uri = URI(url)
         response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 30) do |http|
           request = Net::HTTP::Get.new(uri)
-          request["User-Agent"] = USER_AGENT
+          request["User-Agent"] = browser ? "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36" : USER_AGENT
           request["Accept"] = "text/html,application/xhtml+xml"
+          request["Referer"] = referer if referer
           http.request(request)
         end
         raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)

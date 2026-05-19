@@ -1,5 +1,6 @@
 :concurrency: <%= ENV.fetch("SIDEKIQ_FETCH_CONCURRENCY", 5) %>
 :queues:
   - control
+  - linkedin_details
   - linkedin_pages
   - source_fetchers
