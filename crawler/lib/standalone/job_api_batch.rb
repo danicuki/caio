@@ -1573,9 +1573,32 @@ module Standalone
           source_url: job["hostedUrl"] || job["applyUrl"],
           published_at: parse_time(job["createdAt"]),
           tags: [team, categories["department"], categories["level"]].compact,
-          description: text(Array(job["lists"]).map { |list| [list["text"], list["content"]].compact.join(" ") }.join(" ")),
+          description: lever_description(job),
           raw: job.merge("company_slug" => company)
         }
+      end
+
+      def lever_description(job)
+        sections = []
+        sections << job["description"].to_s.strip
+        Array(job["lists"]).each do |list|
+          title = list["text"].to_s.strip
+          content = list["content"].to_s.strip
+          next if title.empty? && content.empty?
+
+          sections << [title.empty? ? nil : "<h3>#{escape_html(title)}</h3>", content].compact.join("\n")
+        end
+        sections << job["additional"].to_s.strip
+        sections.reject(&:empty?).join("\n")
+      end
+
+      def escape_html(value)
+        value.to_s
+          .gsub("&", "&amp;")
+          .gsub("<", "&lt;")
+          .gsub(">", "&gt;")
+          .gsub('"', "&quot;")
+          .gsub("'", "&#39;")
       end
     end
 
