@@ -171,43 +171,103 @@ module Standalone
           updated_at = excluded.updated_at
       SQL
 
+      update_by_url_sql = <<~SQL
+        UPDATE job_posts SET
+          title = ?,
+          company = ?,
+          location = ?,
+          remote = ?,
+          employment_type = ?,
+          category = ?,
+          salary = ?,
+          published_at = ?,
+          tags_json = ?,
+          description = COALESCE(NULLIF(?, ''), description),
+          raw_json = COALESCE(NULLIF(?, ''), raw_json),
+          salary_min = ?,
+          salary_max = ?,
+          salary_currency = ?,
+          salary_period = ?,
+          location_city = ?,
+          location_state = ?,
+          location_country = ?,
+          location_continent = ?,
+          location_scope = ?,
+          updated_at = ?
+        WHERE source_url = ?
+      SQL
+
       db.transaction do
         statement = db.prepare(sql)
+        update_by_url_statement = db.prepare(update_by_url_sql)
         jobs.each do |job|
           normalized = Normalizer.normalize(job)
-          statement.execute(
-            source_name,
-            job.fetch(:source_key),
-            job.fetch(:title),
-            job[:company],
-            job[:location],
-            native_boolean(job[:remote]),
-            job[:employment_type],
-            job[:category],
-            job[:salary],
-            job.fetch(:source_url),
-            job[:published_at],
-            JSON.generate(job[:tags] || []),
-            job[:description],
-            JSON.generate(job[:raw]),
-            normalized[:salary_min],
-            normalized[:salary_max],
-            normalized[:salary_currency],
-            normalized[:salary_period],
-            normalized[:location_city],
-            normalized[:location_state],
-            normalized[:location_country],
-            normalized[:location_continent],
-            normalized[:location_scope],
-            now,
-            now
-          )
+          source_key = job.fetch(:source_key)
+          source_url = job.fetch(:source_url)
+          tags_json = JSON.generate(job[:tags] || [])
+          raw_json = JSON.generate(job[:raw])
+
+          if duplicate_url_for_other_key?(db, source_url, source_name, source_key)
+            update_by_url_statement.execute(
+              job.fetch(:title),
+              job[:company],
+              job[:location],
+              native_boolean(job[:remote]),
+              job[:employment_type],
+              job[:category],
+              job[:salary],
+              job[:published_at],
+              tags_json,
+              job[:description],
+              raw_json,
+              normalized[:salary_min],
+              normalized[:salary_max],
+              normalized[:salary_currency],
+              normalized[:salary_period],
+              normalized[:location_city],
+              normalized[:location_state],
+              normalized[:location_country],
+              normalized[:location_continent],
+              normalized[:location_scope],
+              now,
+              source_url
+            )
+          else
+            statement.execute(
+              source_name,
+              source_key,
+              job.fetch(:title),
+              job[:company],
+              job[:location],
+              native_boolean(job[:remote]),
+              job[:employment_type],
+              job[:category],
+              job[:salary],
+              source_url,
+              job[:published_at],
+              tags_json,
+              job[:description],
+              raw_json,
+              normalized[:salary_min],
+              normalized[:salary_max],
+              normalized[:salary_currency],
+              normalized[:salary_period],
+              normalized[:location_city],
+              normalized[:location_state],
+              normalized[:location_country],
+              normalized[:location_continent],
+              normalized[:location_scope],
+              now,
+              now
+            )
+          end
         end
       end
       jobs.size
     ensure
       begin
         statement&.close
+        update_by_url_statement&.close
       rescue StandardError
         nil
       end
@@ -404,6 +464,17 @@ module Standalone
       return nil if value.nil?
 
       value ? 1 : 0
+    end
+
+    def duplicate_url_for_other_key?(db, source_url, source_name, source_key)
+      return false if source_url.to_s.empty?
+
+      db.get_first_value(
+        "SELECT 1 FROM job_posts WHERE source_url = ? AND NOT (source = ? AND source_key = ?) LIMIT 1",
+        source_url,
+        source_name,
+        source_key
+      ) == 1
     end
   end
 
