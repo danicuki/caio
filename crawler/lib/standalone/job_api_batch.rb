@@ -1583,13 +1583,22 @@ module Standalone
         sections << job["description"].to_s.strip
         Array(job["lists"]).each do |list|
           title = list["text"].to_s.strip
-          content = list["content"].to_s.strip
+          content = normalize_lever_content(list["content"].to_s.strip)
           next if title.empty? && content.empty?
 
           sections << [title.empty? ? nil : "<h3>#{escape_html(title)}</h3>", content].compact.join("\n")
         end
         sections << job["additional"].to_s.strip
         sections.reject(&:empty?).join("\n")
+      end
+
+      def normalize_lever_content(content)
+        content = content.gsub(%r{</?div[^>]*>}i, "")
+        return content unless content.match?(/<li[\s>]/i)
+
+        content.gsub(%r{(?:\s*<li\b[^>]*>.*?</li>\s*)+}mi) do |items|
+          items.match?(/<ul[\s>]/i) ? items : "<ul>#{items}</ul>"
+        end
       end
 
       def escape_html(value)
