@@ -1,40 +1,93 @@
-<main class="site-shell narrow">
-  <nav class="topbar compact">
-    <a href={~p"/jobs"} class="nav-link">← Back to search</a>
-    <a href={~p"/"} class="brand">Caio</a>
-  </nav>
+<main class="site-shell detail-shell">
+  <.site_nav active="jobs" compact />
 
-  <article class="job-detail">
-    <p class="source-pill">{source_label(@job.source)}</p>
-    <h1>{@job.title}</h1>
-    <p class="detail-meta">
-      <strong>{@job.company || "Company"}</strong>
-      <span>{compact_location(@job)}</span>
-      <%= if salary(@job) do %>
-        <span>{salary(@job)}</span>
+  <article class="job-detail-layout">
+    <section class="job-detail-main">
+      <a href={~p"/jobs"} class="back-link">Back to search</a>
+
+      <header class="detail-hero">
+        <div class="detail-company-line">
+          <.company_avatar job={@job} />
+          <span>
+            <strong>{@job.company || "Company"}</strong>
+            <small>{source_label(@job.source)} · {posted_label(@job)}</small>
+          </span>
+        </div>
+        <h1>{@job.title}</h1>
+        <.metadata_row job={@job} />
+        <.tag_list tags={job_tags(@job)} />
+
+        <form action={~p"/jobs/#{@job.id}/apply"} method="post" class="apply-form">
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <button class="apply-button primary-button" type="submit">Apply to job</button>
+          <span>Records your interest, then opens the original posting.</span>
+        </form>
+      </header>
+
+      <section class="description-block">
+        <h2>Indexed description</h2>
+        <div class="description-body">
+          {raw(description_html(@job.description))}
+        </div>
+      </section>
+
+      <%= unless @lead do %>
+        <.unlock_panel return_to={~p"/jobs/#{@job.id}"} params={%{}} variant="detail" />
       <% end %>
-    </p>
-
-    <form action={~p"/jobs/#{@job.id}/apply"} method="post">
-      <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-      <button class="apply-button" type="submit">Apply to job</button>
-    </form>
-
-    <section class="description-block">
-      <h2>Indexed description</h2>
-      <div class="description-body">
-        {raw(description_html(@job.description))}
-      </div>
     </section>
 
-    <%= unless @lead do %>
-      <section class="unlock-box detail-unlock">
-        <strong>Want unlimited search?</strong>
-        <p>
-          Create a free profile to unlock all search results and receive relevant job-search help.
-        </p>
-        <.lead_form return_to={~p"/jobs/#{@job.id}"} params={%{}} />
+    <aside class="detail-sidebar">
+      <section class="side-card company-card">
+        <div class="preview-company">
+          <.company_avatar job={@job} />
+          <span>
+            <strong>{@job.company || "Company"}</strong>
+            <small>Company profile preview</small>
+          </span>
+        </div>
+        <dl>
+          <div>
+            <dt>Source</dt>
+            <dd>{source_label(@job.source)}</dd>
+          </div>
+          <div>
+            <dt>Location</dt>
+            <dd>{compact_location(@job)}</dd>
+          </div>
+          <div>
+            <dt>Compensation</dt>
+            <dd>{salary(@job) || "Not listed"}</dd>
+          </div>
+        </dl>
       </section>
-    <% end %>
+
+      <section class="side-card salary-card">
+        <span class="eyebrow">Salary insight</span>
+        <h2>{salary(@job) || "Compensation not indexed"}</h2>
+        <p>
+          Caio highlights salary ranges whenever the original posting exposes them. Compare similar roles as the index fills in.
+        </p>
+      </section>
+
+      <section class="side-card">
+        <h2>Similar role signals</h2>
+        <div class="similar-list">
+          <span>{employment_label(@job) || "Full-time"} roles</span>
+          <span>{remote_label(@job) || "Location flexible"} matches</span>
+          <span>{source_label(@job.source)} postings</span>
+        </div>
+      </section>
+
+      <section class="side-card stats-card">
+        <h2>Company stats</h2>
+        <p>Mock profile data will be replaced by company-level enrichment when available.</p>
+        <div class="stats-grid">
+          <span><strong>4.1</strong><small>Glassdoor</small></span>
+          <span><strong>18</strong><small>open roles</small></span>
+        </div>
+      </section>
+    </aside>
   </article>
+
+  <PortalWeb.JobHTML.footer />
 </main>

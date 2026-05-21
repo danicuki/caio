@@ -17,6 +17,7 @@ defmodule Portal.Jobs do
     :employment_type,
     :category,
     :salary,
+    :tags_json,
     :published_at,
     :salary_min,
     :salary_max,

@@ -3,37 +3,131 @@ defmodule PortalWeb.JobHTML do
 
   embed_templates "job_html/*"
 
+  attr :active, :string, default: ""
+  attr :compact, :boolean, default: false
+  attr :count, :any, default: nil
+
+  def site_nav(assigns) do
+    ~H"""
+    <nav class={["topbar", @compact && "compact"]}>
+      <a href={~p"/"} class="brand" aria-label="Caio home">
+        <span class="brand-mark">C</span>
+        <span>Caio</span>
+      </a>
+      <div id="site-nav-menu" class="nav-menu">
+        <div class="nav-links">
+          <a href={~p"/jobs"} class={["nav-link", @active == "jobs" && "active"]}>Jobs</a>
+          <a href={~p"/jobs?order=random"} class="nav-link">Explore</a>
+          <a href="#unlock" class="nav-cta">Free profile</a>
+        </div>
+        <div class="theme-toggle" aria-label="Theme">
+          <button type="button" data-phx-theme="light">Light</button>
+          <button type="button" data-phx-theme="dark">Dark</button>
+          <button type="button" data-phx-theme="system">Auto</button>
+        </div>
+      </div>
+      <%= if @count do %>
+        <span class="nav-muted">{@count}</span>
+      <% end %>
+      <button
+        type="button"
+        class="mobile-menu-button"
+        aria-controls="site-nav-menu"
+        aria-expanded="false"
+      >
+        Menu
+      </button>
+    </nav>
+    """
+  end
+
   attr :job, :map, required: true
+  attr :locked, :boolean, default: false
 
   def job_card(assigns) do
     ~H"""
-    <a href={~p"/jobs/#{@job.id}"} class="job-card">
-      <div>
-        <p class="source-pill">{source_label(@job.source)}</p>
-        <h3>{@job.title}</h3>
-        <p class="job-meta">
+    <a
+      href={if @locked, do: "#unlock", else: ~p"/jobs/#{@job.id}"}
+      class={["job-card", @locked && "locked-card"]}
+    >
+      <.company_avatar job={@job} />
+      <div class="job-card-main">
+        <div class="job-card-topline">
           <span>{@job.company || "Company"}</span>
-          <span>{compact_location(@job)}</span>
-          <%= if salary(@job) do %>
-            <span>{salary(@job)}</span>
-          <% end %>
-        </p>
+          <span>{posted_label(@job)}</span>
+        </div>
+        <h3>{if @locked, do: "Senior role at a verified tech company", else: @job.title}</h3>
+        <.metadata_row job={@job} />
+        <.tag_list tags={job_tags(@job)} />
       </div>
-      <span class="open-arrow">→</span>
+      <span class="open-arrow" aria-hidden="true">{if @locked, do: "Unlock", else: "View"}</span>
     </a>
+    """
+  end
+
+  attr :job, :map, required: true
+
+  def company_avatar(assigns) do
+    ~H"""
+    <span class="company-avatar" aria-hidden="true">{company_initials(@job)}</span>
+    """
+  end
+
+  attr :job, :map, required: true
+
+  def metadata_row(assigns) do
+    ~H"""
+    <p class="job-meta">
+      <span>{compact_location(@job)}</span>
+      <%= if salary(@job) do %>
+        <span>{salary(@job)}</span>
+      <% end %>
+      <%= if employment_label(@job) do %>
+        <span>{employment_label(@job)}</span>
+      <% end %>
+      <%= if remote_label(@job) do %>
+        <span>{remote_label(@job)}</span>
+      <% end %>
+    </p>
+    """
+  end
+
+  attr :tags, :list, default: []
+
+  def tag_list(assigns) do
+    ~H"""
+    <%= if @tags != [] do %>
+      <div class="tag-list">
+        <%= for tag <- Enum.take(@tags, 4) do %>
+          <span class="tag-chip">{tag}</span>
+        <% end %>
+      </div>
+    <% end %>
     """
   end
 
   attr :return_to, :string, required: true
   attr :params, :map, default: %{}
+  attr :variant, :string, default: "card"
 
   def lead_form(assigns) do
     ~H"""
-    <form id="unlock" action={~p"/leads"} method="post" class="lead-form">
+    <form id="unlock" action={~p"/leads"} method="post" class={["lead-form", "lead-form-#{@variant}"]}>
       <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
       <input type="hidden" name="lead[return_to]" value={@return_to} />
-      <input name="lead[email]" type="email" placeholder="you@example.com" required />
-      <input name="lead[linkedin_url]" type="url" placeholder="LinkedIn profile URL (optional)" />
+      <div class="social-row" aria-label="Visual social sign in options">
+        <button type="button">Continue with Google</button>
+        <button type="button">GitHub</button>
+      </div>
+      <div class="form-divider"><span>or unlock with email</span></div>
+      <label>
+        <span>Email</span>
+        <input name="lead[email]" type="email" placeholder="you@example.com" required />
+      </label>
+      <label>
+        <span>LinkedIn URL</span>
+        <input name="lead[linkedin_url]" type="url" placeholder="Optional profile link" />
+      </label>
       <input
         name="lead[target_role]"
         type="text"
@@ -48,10 +142,52 @@ defmodule PortalWeb.JobHTML do
       />
       <label class="checkbox-line">
         <input name="lead[consent_job_help]" value="true" type="checkbox" />
-        <span>Send me relevant job-search help and role recommendations.</span>
+        <span>Send me relevant role recommendations and job-search help.</span>
       </label>
-      <button type="submit">Unlock free search</button>
+      <button type="submit" class="primary-button">Unlock free search</button>
     </form>
+    """
+  end
+
+  attr :return_to, :string, required: true
+  attr :params, :map, default: %{}
+  attr :lead, :map, default: nil
+  attr :variant, :string, default: "panel"
+
+  def unlock_panel(assigns) do
+    ~H"""
+    <%= if @lead do %>
+      <div class={["unlock-box", "success", "unlock-#{@variant}"]}>
+        <span class="eyebrow">Unlocked</span>
+        <strong>Unlimited search active</strong>
+        <p>{@lead.email}</p>
+      </div>
+    <% else %>
+      <section class={["unlock-box", "unlock-#{@variant}"]}>
+        <span class="eyebrow">Free. 20 seconds. No password.</span>
+        <strong>See every match in this search.</strong>
+        <p>
+          Create a free Caio profile to unlock hidden roles, keep your search signal, and get sharper job recommendations.
+        </p>
+        <.lead_form return_to={@return_to} params={@params} variant={@variant} />
+      </section>
+    <% end %>
+    """
+  end
+
+  def footer(assigns) do
+    ~H"""
+    <footer class="site-footer">
+      <div>
+        <strong>Caio</strong>
+        <span>Live tech roles, normalized for people who are tired of noisy boards.</span>
+      </div>
+      <div class="footer-links">
+        <a href={~p"/jobs"}>Jobs</a>
+        <a href={~p"/jobs?order=random"}>Random mix</a>
+        <a href="#unlock">Free profile</a>
+      </div>
+    </footer>
     """
   end
 
@@ -82,6 +218,71 @@ defmodule PortalWeb.JobHTML do
   end
 
   def source_label(source), do: source |> to_string() |> String.capitalize()
+
+  def employment_label(%{employment_type: value}) when value not in [nil, ""],
+    do: value |> to_string() |> String.replace("_", " ") |> String.capitalize()
+
+  def employment_label(_job), do: nil
+
+  def remote_label(%{remote: 1}), do: "Remote"
+  def remote_label(%{location_scope: scope}) when scope in ["remote", "Remote"], do: "Remote"
+  def remote_label(_job), do: nil
+
+  def posted_label(%{published_at: value}) when value not in [nil, ""] do
+    case Date.from_iso8601(String.slice(value, 0, 10)) do
+      {:ok, date} -> relative_date(date)
+      _ -> "Recently indexed"
+    end
+  end
+
+  def posted_label(%{updated_at: value}) when value not in [nil, ""],
+    do: "Indexed #{String.slice(value, 0, 10)}"
+
+  def posted_label(_job), do: "Recently indexed"
+
+  def job_tags(job) do
+    (parsed_tags(job) ++ [job.category, source_label(job.source)])
+    |> Enum.reject(&is_nil_or_empty?/1)
+    |> Enum.map(&String.trim(to_string(&1)))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  def company_initials(job) do
+    source = source_label(Map.get(job, :source))
+
+    (Map.get(job, :company) || source || "Caio")
+    |> to_string()
+    |> String.split(~r/[^a-zA-Z0-9]+/, trim: true)
+    |> Enum.take(2)
+    |> Enum.map_join("", fn part -> part |> String.first() |> String.upcase() end)
+    |> case do
+      "" -> "C"
+      value -> value
+    end
+  end
+
+  defp parsed_tags(%{tags_json: value}) when value not in [nil, ""] do
+    case Jason.decode(value) do
+      {:ok, tags} when is_list(tags) -> tags
+      {:ok, %{"tags" => tags}} when is_list(tags) -> tags
+      _ -> []
+    end
+  end
+
+  defp parsed_tags(_job), do: []
+
+  defp relative_date(date) do
+    days = Date.diff(Date.utc_today(), date)
+
+    cond do
+      days <= 0 -> "Posted today"
+      days == 1 -> "Posted yesterday"
+      days < 30 -> "Posted #{days}d ago"
+      days < 60 -> "Posted 1mo ago"
+      true -> "Posted #{div(days, 30)}mo ago"
+    end
+  end
 
   def clean_description(nil),
     do: "No description indexed yet. Open the original posting for full details."

@@ -1,48 +1,54 @@
-<main class="site-shell">
-  <nav class="topbar compact">
-    <a href={~p"/"} class="brand">Caio</a>
-    <span class="nav-muted">{@total} matching jobs</span>
-  </nav>
+<main class="site-shell results-shell">
+  <.site_nav active="jobs" compact count={"#{@total} matching jobs"} />
+
+  <section class="search-command">
+    <div>
+      <p class="eyebrow">Search results</p>
+      <h1>Find the roles with enough signal to open.</h1>
+    </div>
+    <form action={~p"/jobs"} method="get" class="search-panel results-search">
+      <label>
+        <span>Keyword</span>
+        <input name="q" type="search" value={@params["q"]} placeholder="react, rails, staff" />
+      </label>
+      <label>
+        <span>Location</span>
+        <input name="location" type="search" value={@params["location"]} placeholder="remote, London" />
+      </label>
+      <button type="submit" class="primary-button">Search</button>
+    </form>
+  </section>
+
+  <div class="mobile-filter-chips" aria-label="Quick filters">
+    <span>Remote</span>
+    <span>Salary listed</span>
+    <span>Visa friendly</span>
+    <span>Senior</span>
+  </div>
 
   <section class="results-layout">
     <aside class="filter-panel">
-      <h1>Search jobs</h1>
+      <div class="filter-heading">
+        <h2>Filters</h2>
+        <a href={~p"/jobs"}>Clear</a>
+      </div>
+
       <form action={~p"/jobs"} method="get" class="stack-form">
         <label>
-          <span>Keyword</span>
-          <input
-            name="q"
-            type="search"
-            value={@params["q"]}
-            placeholder="kubernetes, phoenix, designer"
-          />
-        </label>
-        <label>
           <span>Role</span>
-          <input
-            name="role"
-            type="search"
-            value={@params["role"]}
-            placeholder="software engineer"
-          />
-        </label>
-        <label>
-          <span>Location</span>
-          <input
-            name="location"
-            type="search"
-            value={@params["location"]}
-            placeholder="remote, London, US"
-          />
+          <input name="role" type="search" value={@params["role"]} placeholder="software engineer" />
         </label>
         <label>
           <span>Company</span>
-          <input
-            name="company"
-            type="search"
-            value={@params["company"]}
-            placeholder="stripe, figma, openai"
-          />
+          <input name="company" type="search" value={@params["company"]} placeholder="stripe, figma" />
+        </label>
+        <label>
+          <span>Keyword</span>
+          <input name="q" type="search" value={@params["q"]} placeholder="kubernetes, growth" />
+        </label>
+        <label>
+          <span>Location</span>
+          <input name="location" type="search" value={@params["location"]} placeholder="remote, Europe" />
         </label>
         <label>
           <span>Order</span>
@@ -51,45 +57,102 @@
             <option value="random" selected={@params["order"] == "random"}>Random mix</option>
           </select>
         </label>
-        <button type="submit">Search</button>
+        <button type="submit" class="primary-button">Apply filters</button>
       </form>
 
-      <%= if @unlocked? do %>
-        <div class="unlock-box success">
-          <strong>Unlimited search active</strong>
-          <span>{@lead.email}</span>
+      <div class="mock-filters" aria-label="Additional prototype filters">
+        <div>
+          <strong>Role family</strong>
+          <span>Engineering</span>
+          <span>Design</span>
+          <span>Data</span>
         </div>
-      <% else %>
-        <div class="unlock-box">
-          <strong>Unlock unlimited results</strong>
-          <p>
-            Preview 10 jobs now. Create a free profile to see every match and save your search signal.
-          </p>
-          <.lead_form return_to={Phoenix.Controller.current_path(@conn)} params={@params} />
+        <div>
+          <strong>Seniority</strong>
+          <span>Mid-level</span>
+          <span>Senior</span>
+          <span>Staff+</span>
         </div>
-      <% end %>
+        <div>
+          <strong>Workplace</strong>
+          <span>Remote</span>
+          <span>Hybrid</span>
+          <span>Office</span>
+        </div>
+        <div>
+          <strong>Perks</strong>
+          <span>Visa sponsorship</span>
+          <span>Equity</span>
+          <span>Salary listed</span>
+        </div>
+      </div>
+
+      <.unlock_panel
+        lead={@lead}
+        return_to={Phoenix.Controller.current_path(@conn)}
+        params={@params}
+        variant="panel"
+      />
     </aside>
 
     <section class="job-results">
       <div class="results-heading">
-        <h2>Best matches</h2>
-        <span>Updated from crawler index</span>
+        <div>
+          <h2>Best matches</h2>
+          <span>Guest preview shows {@guest_limit}; unlock for the deeper list.</span>
+        </div>
+        <span class="freshness-pill">Verified · live index</span>
       </div>
+
+      <%= if @jobs == [] do %>
+        <div class="empty-state">
+          <h3>No matches yet</h3>
+          <p>Try a broader keyword or remove one of the filters.</p>
+        </div>
+      <% end %>
 
       <%= for {job, index} <- Enum.with_index(@jobs) do %>
         <%= if @unlocked? or index < @guest_limit do %>
           <.job_card job={job} />
         <% else %>
-          <div class="job-card locked-card">
-            <div>
-              <p class="source-pill">Locked match</p>
-              <h3>Senior role at a verified tech company</h3>
-              <p>Location, salary and apply link available after free unlock.</p>
-            </div>
-            <a href="#unlock" class="soft-button">Unlock</a>
-          </div>
+          <.job_card job={job} locked />
         <% end %>
       <% end %>
     </section>
+
+    <aside class="preview-panel">
+      <%= if selected = List.first(@jobs) do %>
+        <div class="preview-card">
+          <div class="preview-company">
+            <.company_avatar job={selected} />
+            <span>
+              <strong>{selected.company || "Company"}</strong>
+              <small>{source_label(selected.source)} source</small>
+            </span>
+          </div>
+          <h2>{selected.title}</h2>
+          <.metadata_row job={selected} />
+          <.tag_list tags={job_tags(selected)} />
+          <p>{clean_description(selected.description)}</p>
+          <a href={~p"/jobs/#{selected.id}"} class="primary-button preview-apply">Open role</a>
+        </div>
+      <% else %>
+        <div class="preview-card">
+          <h2>Search preview</h2>
+          <p>Run a search to see the first role summarized here.</p>
+        </div>
+      <% end %>
+    </aside>
   </section>
+
+  <%= unless @unlocked? do %>
+    <div class="mobile-unlock-sheet">
+      <.unlock_panel
+        lead={@lead}
+        return_to={Phoenix.Controller.current_path(@conn)}
+        params={@params}
+        variant="sheet"
+      />
+    </div>
+  <% end %>
 </main>

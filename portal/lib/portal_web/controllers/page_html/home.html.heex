@@ -1,54 +1,103 @@
-<main class="site-shell">
-  <section class="hero-band">
-    <nav class="topbar">
-      <a href={~p"/"} class="brand">Caio</a>
-      <a href={~p"/jobs"} class="nav-link">Browse jobs</a>
-    </nav>
+<main class="site-shell landing-shell">
+  <PortalWeb.JobHTML.site_nav active="home" />
 
+  <section class="hero-band">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow">Fast search across global tech roles</p>
-        <h1>Find the role that is still worth applying to.</h1>
+        <p class="eyebrow">Live global tech index</p>
+        <h1>The next job you'll actually want is in here somewhere.</h1>
         <p class="hero-subtitle">
-          Search indexed jobs from public boards, company career pages, and ATS feeds with normalized location and salary data.
+          Search public boards, ATS feeds, and company career pages with cleaner location,
+          salary, and source signals.
         </p>
 
         <p class="job-count-badge">
           <strong>{delimit(@total_jobs)}</strong>
-          <span>jobs and counting</span>
+          <span>indexed roles</span>
         </p>
 
-        <form action={~p"/jobs"} method="get" class="search-panel">
+        <form action={~p"/jobs"} method="get" class="search-panel hero-search">
           <label>
             <span>Role or keyword</span>
-            <input name="q" type="search" placeholder="backend, elixir, data, devops" />
+            <input name="q" type="search" placeholder="backend, react, data, devops" />
           </label>
           <label>
             <span>Location</span>
             <input name="location" type="search" placeholder="Lisbon, remote, Europe" />
           </label>
-          <button type="submit">Search jobs</button>
+          <button type="submit" class="primary-button">Search jobs</button>
         </form>
 
-        <p class="privacy-note">
-          Free search preview. Create a free profile to unlock unlimited results and receive relevant job-search help.
-        </p>
+        <p class="privacy-note">Free preview. Unlock the full index with an email, no password.</p>
       </div>
 
-      <div class="hero-proof" aria-label="Job search snapshot">
-        <div class="stat-line">
-          <strong>{length(@sample_jobs)} live examples</strong>
-          <span>from the current index</span>
+      <aside class="live-index-panel" aria-label="Live job index snapshot">
+        <div class="map-card">
+          <div class="map-header">
+            <span>World index</span>
+            <strong>{delimit(@total_jobs)}</strong>
+          </div>
+          <div class="world-map">
+            <span class="map-pin pin-na"></span>
+            <span class="map-pin pin-eu"></span>
+            <span class="map-pin pin-apac"></span>
+            <span class="map-pin pin-remote"></span>
+          </div>
+          <div class="map-stats">
+            <span>Remote</span>
+            <span>Hybrid</span>
+            <span>On-site</span>
+          </div>
         </div>
+
         <div class="mini-list">
           <%= for job <- @sample_jobs do %>
             <a href={~p"/jobs/#{job.id}"} class="mini-job">
-              <strong>{job.title}</strong>
-              <span>{job.company || "Company"} · {PortalWeb.JobHTML.compact_location(job)}</span>
+              <PortalWeb.JobHTML.company_avatar job={job} />
+              <span>
+                <strong>{job.title}</strong>
+                <small>
+                  {job.company || "Company"} · {PortalWeb.JobHTML.compact_location(job)}
+                </small>
+              </span>
             </a>
           <% end %>
         </div>
-      </div>
+      </aside>
     </div>
   </section>
+
+  <section class="logo-strip" aria-label="Example indexed companies">
+    <span>Indexed from public sources around</span>
+    <strong>Stripe</strong>
+    <strong>Figma</strong>
+    <strong>GitHub</strong>
+    <strong>Shopify</strong>
+    <strong>Vercel</strong>
+  </section>
+
+  <section class="feature-band">
+    <article>
+      <span class="feature-icon">0</span>
+      <h2>Free to use</h2>
+      <p>Preview real roles immediately and unlock the deeper list without a paid account.</p>
+    </article>
+    <article>
+      <span class="feature-icon">S</span>
+      <h2>Saved search signal</h2>
+      <p>Your target role and location become the profile Caio uses to sharpen recommendations.</p>
+    </article>
+    <article>
+      <span class="feature-icon">D</span>
+      <h2>Daily digest ready</h2>
+      <p>New roles, salary clues, and source updates are structured for a quieter job routine.</p>
+    </article>
+    <article>
+      <span class="feature-icon">%</span>
+      <h2>Salary comparisons</h2>
+      <p>When postings include compensation, Caio keeps it visible instead of buried in prose.</p>
+    </article>
+  </section>
+
+  <PortalWeb.JobHTML.footer />
 </main>

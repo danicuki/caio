@@ -88,3 +88,32 @@ document.querySelectorAll("[role=alert][data-flash]").forEach((el) => {
     el.setAttribute("hidden", "")
   })
 })
+
+// Mobile navigation menu
+document.querySelectorAll(".topbar").forEach((topbar) => {
+  const button = topbar.querySelector(".mobile-menu-button")
+  const menu = topbar.querySelector(".nav-menu")
+
+  if (!button || !menu) return
+
+  const setOpen = (open) => {
+    topbar.classList.toggle("menu-open", open)
+    button.setAttribute("aria-expanded", open ? "true" : "false")
+  }
+
+  button.addEventListener("click", () => {
+    setOpen(!topbar.classList.contains("menu-open"))
+  })
+
+  menu.querySelectorAll("a, button").forEach((item) => {
+    item.addEventListener("click", () => setOpen(false))
+  })
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setOpen(false)
+  })
+
+  document.addEventListener("click", (event) => {
+    if (!topbar.contains(event.target)) setOpen(false)
+  })
+})
