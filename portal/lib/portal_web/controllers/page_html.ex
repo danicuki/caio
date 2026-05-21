@@ -7,4 +7,12 @@ defmodule PortalWeb.PageHTML do
   use PortalWeb, :html
 
   embed_templates "page_html/*"
+
+  def delimit(number) do
+    number
+    |> to_string()
+    |> String.reverse()
+    |> String.replace(~r/(\d{3})(?=\d)/, "\\1,")
+    |> String.reverse()
+  end
 end

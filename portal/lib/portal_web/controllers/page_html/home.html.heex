@@ -13,6 +13,11 @@
           Search indexed jobs from public boards, company career pages, and ATS feeds with normalized location and salary data.
         </p>
 
+        <p class="job-count-badge">
+          <strong>{delimit(@total_jobs)}</strong>
+          <span>jobs and counting</span>
+        </p>
+
         <form action={~p"/jobs"} method="get" class="search-panel">
           <label>
             <span>Role or keyword</span>

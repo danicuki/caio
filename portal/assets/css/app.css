@@ -245,6 +245,30 @@ select {
   line-height: 1.55;
 }
 
+.job-count-badge {
+  display: flex;
+  width: fit-content;
+  align-items: baseline;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #c8ded8;
+  border-radius: 8px;
+  background: #f7fbf9;
+  color: var(--ink);
+}
+
+.job-count-badge strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.job-count-badge span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .search-panel {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.8fr) auto;
