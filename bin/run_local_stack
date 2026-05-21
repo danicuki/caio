@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CRAWLER_DIR="$ROOT_DIR/crawler"
+PORTAL_DIR="$ROOT_DIR/portal"
+
+REDIS_CONTAINER="${REDIS_CONTAINER:-caio-redis}"
+REDIS_IMAGE="${REDIS_IMAGE:-redis:7-alpine}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+REDIS_URL="${REDIS_URL:-redis://localhost:${REDIS_PORT}/0}"
+export REDIS_PORT REDIS_URL
+REDIS_READY_TIMEOUT="${REDIS_READY_TIMEOUT:-300}"
+
+SIDEKIQ_WRITER_CONCURRENCY="${SIDEKIQ_WRITER_CONCURRENCY:-1}"
+SIDEKIQ_FETCH_CONCURRENCY="${SIDEKIQ_FETCH_CONCURRENCY:-4}"
+SIDEKIQ_SOURCE_CONCURRENCY="${SIDEKIQ_SOURCE_CONCURRENCY:-5}"
+PORTAL_PORT="${PORTAL_PORT:-4000}"
+SIDEKIQ_WEB_PORT="${SIDEKIQ_WEB_PORT:-3001}"
+
+RESTART=false
+SERVICES=()
+
+usage() {
+  cat <<USAGE
+Usage: bin/run_local_stack [--restart] [service...]
+
+Services:
+  all          Start everything. Default when no service is provided.
+  redis        Start Docker Redis only.
+  workers      Start Redis, Sidekiq worker pools, and crawler schedulers.
+  writer       Start Redis and the SQLite writer Sidekiq pool.
+  fetch        Start Redis and the fetch/control Sidekiq pool.
+  sources      Start Redis and the source fetcher Sidekiq pool.
+  sidekiq-web  Start Redis and the Rails Sidekiq web UI.
+  portal       Start the Phoenix portal only.
+  schedulers   Enqueue crawler scheduler jobs only.
+
+Examples:
+  bin/run_local_stack --restart
+  bin/run_local_stack portal
+  bin/run_local_stack sidekiq-web
+  bin/run_local_stack workers
+USAGE
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --restart)
+      RESTART=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    all|redis|workers|writer|fetch|sources|sidekiq-web|portal|schedulers)
+      SERVICES+=("$arg")
+      ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ${#SERVICES[@]} -eq 0 ]]; then
+  SERVICES=(all)
+fi
+
+if command -v bundle >/dev/null 2>&1; then
+  BUNDLE_BIN="$(command -v bundle)"
+elif [[ -x "$HOME/.local/share/gem/ruby/3.4.0/bin/bundle" ]]; then
+  BUNDLE_BIN="$HOME/.local/share/gem/ruby/3.4.0/bin/bundle"
+else
+  echo "Bundler not found. Install bundler or update BUNDLE_BIN in this script." >&2
+  exit 1
+fi
+
+redis_ping() {
+  ruby -rsocket -e '
+    socket = TCPSocket.new("127.0.0.1", ENV.fetch("REDIS_PORT"))
+    socket.write("*1\r\n$4\r\nPING\r\n")
+    response = socket.readpartial(64)
+    exit(response.include?("PONG") ? 0 : 1)
+  ' >/dev/null 2>&1
+}
+
+start_redis() {
+  if redis_ping; then
+    echo "Redis is already reachable on localhost:${REDIS_PORT}"
+    return
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Redis is not reachable and docker is not installed/in PATH." >&2
+    exit 1
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
+    echo "Redis container $REDIS_CONTAINER is running, waiting for Redis..."
+  elif docker ps -a --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
+    echo "Starting existing Redis container $REDIS_CONTAINER"
+    docker start "$REDIS_CONTAINER" >/dev/null
+  else
+    echo "Creating Redis container $REDIS_CONTAINER on port ${REDIS_PORT}"
+    docker run -d --name "$REDIS_CONTAINER" -p "${REDIS_PORT}:6379" "$REDIS_IMAGE" >/dev/null
+  fi
+
+  for ((attempt = 1; attempt <= REDIS_READY_TIMEOUT; attempt++)); do
+    redis_ping && {
+      echo "Redis is ready"
+      return
+    }
+    if (( attempt % 30 == 0 )); then
+      echo "Still waiting for Redis on localhost:${REDIS_PORT} (${attempt}s/${REDIS_READY_TIMEOUT}s)"
+    fi
+    sleep 1
+  done
+
+  echo "Redis did not become ready on localhost:${REDIS_PORT} after ${REDIS_READY_TIMEOUT}s" >&2
+  exit 1
+}
+
+session_exists() {
+  tmux has-session -t "$1" 2>/dev/null
+}
+
+stop_session() {
+  local name="$1"
+  if session_exists "$name"; then
+    tmux kill-session -t "$name"
+  fi
+}
+
+start_session() {
+  local name="$1"
+  local command="$2"
+
+  if $RESTART; then
+    stop_session "$name"
+  fi
+
+  if session_exists "$name"; then
+    echo "tmux session $name already running"
+    return
+  fi
+
+  echo "Starting $name"
+  tmux new-session -d -s "$name" "$command"
+}
+
+rails_runner() {
+  (cd "$CRAWLER_DIR" && REDIS_URL="$REDIS_URL" "$BUNDLE_BIN" exec rails runner "$1")
+}
+
+requested() {
+  local service="$1"
+  local selected
+  for selected in "${SERVICES[@]}"; do
+    if [[ "$selected" == "all" || "$selected" == "$service" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+workers_requested() {
+  requested workers || requested writer || requested fetch || requested sources
+}
+
+redis_requested() {
+  requested redis || requested sidekiq-web || requested schedulers || workers_requested
+}
+
+if redis_requested; then
+  start_redis
+fi
+
+if requested workers || requested writer; then
+  start_session "caio_writer" \
+    "cd '$CRAWLER_DIR' && REDIS_URL='$REDIS_URL' SIDEKIQ_WRITER_CONCURRENCY='$SIDEKIQ_WRITER_CONCURRENCY' '$BUNDLE_BIN' exec sidekiq -C config/sidekiq_writer.yml"
+fi
+
+if requested workers || requested fetch; then
+  start_session "caio_fetch" \
+    "cd '$CRAWLER_DIR' && REDIS_URL='$REDIS_URL' SIDEKIQ_FETCH_CONCURRENCY='$SIDEKIQ_FETCH_CONCURRENCY' '$BUNDLE_BIN' exec sidekiq -C config/sidekiq_fetch.yml"
+fi
+
+if requested workers || requested sources; then
+  start_session "caio_sources" \
+    "cd '$CRAWLER_DIR' && REDIS_URL='$REDIS_URL' SIDEKIQ_SOURCE_CONCURRENCY='$SIDEKIQ_SOURCE_CONCURRENCY' '$BUNDLE_BIN' exec sidekiq -C config/sidekiq_sources.yml"
+fi
+
+if requested sidekiq-web; then
+  start_session "caio_web" \
+    "cd '$CRAWLER_DIR' && REDIS_URL='$REDIS_URL' '$BUNDLE_BIN' exec rails server -b 127.0.0.1 -p '$SIDEKIQ_WEB_PORT'"
+fi
+
+if requested portal; then
+  start_session "caio_portal" \
+    "cd '$PORTAL_DIR' && PORT='$PORTAL_PORT' mix phx.server"
+fi
+
+if requested all || requested workers || requested schedulers; then
+  echo "Enqueueing crawler schedulers"
+  rails_runner 'SourceFanoutSchedulerWorker.perform_async; LinkedinSchedulerWorker.perform_async; puts "scheduled"'
+fi
+
+echo
+echo "Requested Caio services are running: ${SERVICES[*]}"
+echo "Portal:      http://localhost:${PORTAL_PORT}"
+echo "Sidekiq UI:  http://localhost:${SIDEKIQ_WEB_PORT}/sidekiq"
+echo
+echo "Inspect sessions:"
+echo "  tmux ls"
+echo "  tmux attach -t caio_writer"
+echo "  tmux attach -t caio_fetch"
+echo "  tmux attach -t caio_sources"
+echo "  tmux attach -t caio_web"
+echo "  tmux attach -t caio_portal"
+echo
+echo "Useful commands:"
+echo "  bin/run_local_stack --restart"
+echo "  bin/run_local_stack portal"
+echo "  bin/run_local_stack sidekiq-web"
+echo "  bin/run_local_stack workers"

@@ -33,6 +33,28 @@ The crawler owns ingestion and data quality. The portal owns search, lead/profil
 
 ## Quick Start
 
+Start the full local stack after a reboot:
+
+```sh
+bin/run_local_stack --restart
+```
+
+This starts Docker Redis (`caio-redis`), Sidekiq writer/fetch/source workers, the Rails Sidekiq UI on `http://localhost:3001/sidekiq`, and the Phoenix portal on `http://localhost:4000`.
+
+You can also start pieces independently:
+
+```sh
+bin/run_local_stack portal
+bin/run_local_stack sidekiq-web
+bin/run_local_stack workers
+```
+
+If Redis is loading a large persisted queue, the script waits up to 5 minutes by default. Override with:
+
+```sh
+REDIS_READY_TIMEOUT=900 bin/run_local_stack --restart
+```
+
 Run crawler workers:
 
 ```sh
