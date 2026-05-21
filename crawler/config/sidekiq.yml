@@ -1,6 +1,8 @@
 :concurrency: <%= ENV.fetch("SIDEKIQ_CONCURRENCY", 1) %>
 :queues:
   - control
+  - web3_details
+  - linkedin_details
   - linkedin_pages
   - source_fetchers
   - job_writes

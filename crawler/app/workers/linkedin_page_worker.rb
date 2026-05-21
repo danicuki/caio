@@ -18,7 +18,7 @@ class LinkedinPageWorker
 
     source = Standalone::Sources::LinkedinPublic.new
     jobs = source.send(:fetch_page, keyword: keyword, location: location.to_s, start: Integer(start))
-    JobPostImportWorker.perform_async("linkedin", JSON.generate(jobs))
+    JobPostImportWorker.enqueue("linkedin", jobs)
   rescue Standalone::RateLimited => e
     raise
   rescue StandardError => e

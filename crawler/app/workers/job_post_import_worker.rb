@@ -5,9 +5,17 @@ class JobPostImportWorker
 
   sidekiq_options queue: :job_writes, retry: 10
 
-  def perform(source, jobs_json)
-    jobs = JSON.parse(jobs_json, symbolize_names: true)
+  def self.enqueue(source, jobs)
+    return if jobs.empty?
+
+    perform_async(source, JobBatchSpool.write(source, jobs))
+  end
+
+  def perform(source, jobs_payload)
+    jobs = JobBatchSpool.read(jobs_payload)
     imported = database.upsert_jobs(source, jobs)
+    JobBatchSpool.delete(jobs_payload)
+
     SourceRun.create!(
       source: source,
       status: "imported",

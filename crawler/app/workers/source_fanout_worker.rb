@@ -44,6 +44,7 @@ class SourceFanoutWorker
   def perform
     enqueue_static_sources
     enqueue_jobicy
+    enqueue_web3career
     enqueue_company_boards
     enqueue_company_name_ats_probes
     enqueue_new_ats_sources
@@ -64,6 +65,22 @@ class SourceFanoutWorker
     (Standalone::Sources::Jobicy::INDUSTRIES + Standalone::Sources::Jobicy::TAGS).uniq.each do |value|
       key = Standalone::Sources::Jobicy::INDUSTRIES.include?(value) ? "industry" : "tag"
       StandaloneSourceFetchWorker.perform_async("jobicy", { key => value })
+    end
+  end
+
+  def enqueue_web3career
+    StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api" })
+
+    Standalone::Sources::Web3Career::TAGS.each do |tag|
+      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api", "tag" => tag })
+    end
+
+    Standalone::Sources::Web3Career::COUNTRIES.each do |country|
+      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api", "country" => country })
+    end
+
+    Integer(ENV.fetch("WEB3CAREER_SOURCE_PAGES", "5000")).times do |index|
+      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "html", "page" => index + 1 })
     end
   end
 

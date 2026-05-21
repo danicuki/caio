@@ -8,7 +8,7 @@ class StandaloneSourceFetchWorker
   def perform(source_name, params = {})
     params = params.with_indifferent_access
     jobs = fetch(source_name, params)
-    JobPostImportWorker.perform_async(source_name, JSON.generate(jobs)) if jobs.any?
+    JobPostImportWorker.enqueue(source_name, jobs)
   end
 
   private
@@ -21,6 +21,8 @@ class StandaloneSourceFetchWorker
       Standalone::Sources::RemoteOk.new.fetch
     when "jobicy"
       Standalone::Sources::Jobicy.new.send(:fetch_query, params[:query])
+    when "web3career"
+      fetch_web3career(params)
     when "arbeitnow"
       Standalone::Sources::Arbeitnow.new.send(:fetch_pages, start_page: Integer(params.fetch(:page)), max_pages: 1).fetch(:jobs)
     when "themuse"
@@ -86,6 +88,23 @@ class StandaloneSourceFetchWorker
         description: smartrecruiters_description(detail),
         raw: job.merge(detail).merge("smartrecruiters_company" => company)
       }
+    end
+  end
+
+  def fetch_web3career(params)
+    source = Standalone::Sources::Web3Career.new
+    mode = params.fetch(:mode, "api")
+
+    case mode
+    when "api"
+      query = {}
+      query["tag"] = params[:tag] if params[:tag].present?
+      query["country"] = params[:country] if params[:country].present?
+      source.fetch_api_query(query.empty? ? nil : query)
+    when "html"
+      source.fetch_html_page(Integer(params.fetch(:page)))
+    else
+      raise ArgumentError, "Unknown web3career mode #{mode.inspect}"
     end
   end
 

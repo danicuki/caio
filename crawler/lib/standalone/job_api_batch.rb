@@ -1,12 +1,16 @@
 require "csv"
+require "cgi"
 require "digest"
 require "fileutils"
 require "json"
 require "net/http"
+require "nokogiri"
 require "open3"
 require "shellwords"
 require "time"
 require "uri"
+
+require_relative "job_quality"
 
 begin
   require "sqlite3"
@@ -27,6 +31,11 @@ module Standalone
     end
 
     def upsert_jobs(source_name, jobs)
+      fetched_count = jobs.size
+      classifier = JobQuality::AiClassifier.new(@path) if JobQuality::AiClassifier.enabled?
+      jobs = JobQuality.filter(source_name, jobs, classifier: classifier)
+      rejected_count = fetched_count - jobs.size
+      warn "quality gate rejected #{rejected_count}/#{fetched_count} #{source_name} jobs" if rejected_count.positive?
       return 0 if jobs.empty?
 
       return upsert_jobs_native(source_name, jobs) if defined?(SQLite3::Database)
@@ -409,6 +418,20 @@ module Standalone
           last_error TEXT,
           updated_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS job_quality_classifications (
+          fingerprint TEXT PRIMARY KEY,
+          source TEXT,
+          source_key TEXT,
+          source_url TEXT,
+          title TEXT,
+          score REAL NOT NULL,
+          label TEXT,
+          reason TEXT,
+          provider TEXT,
+          model TEXT,
+          created_at TEXT NOT NULL
+        );
       SQL
       add_column_if_missing("job_posts", "salary_min", "REAL")
       add_column_if_missing("job_posts", "salary_max", "REAL")
@@ -427,6 +450,8 @@ module Standalone
         CREATE INDEX IF NOT EXISTS index_job_posts_location_country ON job_posts(location_country);
         CREATE INDEX IF NOT EXISTS index_job_posts_location_continent ON job_posts(location_continent);
         CREATE INDEX IF NOT EXISTS index_job_posts_location_scope ON job_posts(location_scope);
+        CREATE INDEX IF NOT EXISTS index_job_quality_classifications_score ON job_quality_classifications(score);
+        CREATE INDEX IF NOT EXISTS index_job_quality_classifications_source ON job_quality_classifications(source);
       SQL
     end
 
@@ -1325,6 +1350,294 @@ module Standalone
       end
     end
 
+    class Web3Career < Base
+      API_TOKEN = "o8KS57qZNyYZfGAqqQnPuVDK5URZjgwH".freeze
+
+      TAGS = %w[
+        ai backend blockchain business-development community content crypto customer-success
+        data defi design devops engineering finance frontend full-stack gaming go growth
+        javascript legal marketing mobile nft node operations product product-manager python
+        react remote rust sales security solidity support typescript web3
+      ].freeze
+
+      COUNTRIES = %w[
+        united-states united-kingdom canada germany france portugal spain netherlands singapore
+        hong-kong india united-arab-emirates australia brazil argentina mexico switzerland
+        poland ireland japan south-korea thailand indonesia vietnam nigeria south-africa remote
+      ].freeze
+
+      def name = "web3career"
+
+      def fetch
+        ([nil] + TAGS.map { |tag| { "tag" => tag } } + COUNTRIES.map { |country| { "country" => country } })
+          .flat_map { |query| fetch_api_query(query) }
+          .uniq { |job| job[:source_key] }
+      end
+
+      def fetch_api_query(query = nil)
+        params = {
+          "limit" => "100",
+          "token" => ENV.fetch("WEB3_CAREER_API_TOKEN", API_TOKEN)
+        }
+        params.merge!(query) if query
+
+        payload = get_json("https://web3.career/api/v1?#{URI.encode_www_form(params)}")
+        jobs = payload.find { |item| item.is_a?(Array) && item.first.is_a?(Hash) } || []
+        jobs.map { |job| normalize_api_job(job) }
+      rescue StandardError => e
+        warn "web3career api query failed #{query.inspect}: #{e.class}: #{e.message}"
+        []
+      end
+
+      def fetch_html_page(page)
+        html = get_html("https://web3.career/?page=#{page}")
+        doc = Nokogiri::HTML(html)
+
+        doc.css("tr[data-jobid]").filter_map do |row|
+          normalize_html_row(row)
+        end
+      rescue StandardError => e
+        warn "web3career html page failed page=#{page.inspect}: #{e.class}: #{e.message}"
+        []
+      end
+
+      def fetch_detail_description(url)
+        html = get_html(url)
+        doc = Nokogiri::HTML(html)
+
+        meta_description =
+          doc.at_css("meta[property='og:description']")&.[]("content") ||
+          doc.at_css("meta[name='description']")&.[]("content")
+
+        description = CGI.unescapeHTML(meta_description.to_s).strip
+        return format_plain_description(description) unless description.empty?
+
+        nil
+      rescue StandardError => e
+        warn "web3career detail failed url=#{url.inspect}: #{e.class}: #{e.message}"
+        nil
+      end
+
+      def format_plain_description(description)
+        text = description.to_s
+        2.times { text = CGI.unescapeHTML(text) }
+        text = text.gsub(/\s+/, " ").strip
+        return nil if text.empty?
+
+        text = text.gsub(/([a-z0-9])\.([A-Z])/, "\\1. \\2")
+
+        headings = [
+          "About Us",
+          "About the Team",
+          "Responsibilities",
+          "Requirements",
+          "Qualifications",
+          "Benefits",
+          "About The Role",
+          "About the Role",
+          "What You'll Do",
+          "What You’ll Do",
+          "Who You Are",
+          "Your skills",
+          "Technologies we use",
+          "About Working With Us",
+          "How You'll Grow",
+          "How You’ll Grow"
+        ].sort_by { |heading| -heading.length }
+        heading_pattern = headings.map { |heading| Regexp.escape(heading) }.join("|")
+        chunks = text.split(/(?=\b(?:#{heading_pattern})(?=[:\s-]|[A-Z]|\z))/i).map(&:strip).reject(&:empty?)
+
+        chunks.map do |chunk|
+          if (match = chunk.match(/\A(#{heading_pattern})[:\s-]*(.*)\z/i))
+            heading = CGI.escapeHTML(match[1])
+            body = format_section_body(match[1], match[2].to_s.strip)
+            body.empty? ? "<h4>#{heading}</h4>" : "<h4>#{heading}</h4>#{body}"
+          else
+            "<p>#{CGI.escapeHTML(chunk)}</p>"
+          end
+        end.join("\n")
+      end
+
+      private
+
+      WEB3_BULLET_LABELS = [
+        "Developer Tooling",
+        "Developer Advocacy",
+        "Building dApps",
+        "Documentation & Learning Resources",
+        "Emerging Initiatives",
+        "Prototyping mindset",
+        "Developer communications",
+        "AI adept",
+        "Web3 curiosity",
+        "Bonus points",
+        "Nice to have",
+        "Must have",
+        "You have",
+        "You are",
+        "You will",
+        "Responsibilities",
+        "Requirements",
+        "Benefits"
+      ].sort_by { |label| -label.length }.freeze
+
+      WEB3_BULLET_SECTIONS = [
+        "What You'll Do",
+        "What You’ll Do",
+        "Your skills",
+        "Skills"
+      ].map(&:downcase).freeze
+
+      def format_section_body(heading, body)
+        return "" if body.empty?
+
+        items = colon_bullet_items(heading, body)
+        return "<p>#{CGI.escapeHTML(body)}</p>" if items.empty?
+
+        preamble = body[0...items.first.fetch(:begin)].to_s.strip
+        preamble_html = preamble.empty? ? "" : "<p>#{CGI.escapeHTML(preamble)}</p>"
+        list = items.map do |item|
+          label = CGI.escapeHTML(item.fetch(:label))
+          text = CGI.escapeHTML(item.fetch(:text))
+          "<li><strong>#{label}:</strong> #{text}</li>"
+        end.join
+        "#{preamble_html}<ul>#{list}</ul>"
+      end
+
+      def colon_bullet_items(heading, body)
+        labels = WEB3_BULLET_LABELS.map { |label| Regexp.escape(label) }.join("|")
+        matches = body.to_enum(:scan, /\b(#{labels})\s*:\s*/i).map do
+          match = Regexp.last_match
+          { label: match[1], begin: match.begin(0), end: match.end(0) }
+        end
+        return [] if matches.empty?
+
+        bullet_section = WEB3_BULLET_SECTIONS.include?(heading.downcase)
+        return [] if matches.length == 1 && !bullet_section
+
+        matches.each_with_index.filter_map do |match, index|
+          next_match = matches[index + 1]
+          text = body[match[:end]...(next_match ? next_match[:begin] : body.length)].to_s.strip
+          next if text.empty?
+
+          { label: match[:label], text: text, begin: match[:begin] }
+        end
+      end
+
+      def normalize_api_job(job)
+        salary = salary_text(
+          job["salary_min_value"],
+          job["salary_max_value"],
+          job["salary_currency"],
+          job["salary_unit"]
+        )
+
+        {
+          source_key: job.fetch("id").to_s,
+          title: job.fetch("title"),
+          company: job["company"],
+          location: [job["city"], job["country"], job["location"]].compact.map(&:to_s).reject(&:empty?).uniq.join(", "),
+          remote: job["is_remote"],
+          employment_type: nil,
+          category: "Web3",
+          salary: salary,
+          source_url: job["apply_url"] || "https://web3.career/jobs/#{job["id"]}",
+          published_at: parse_time(job["date_epoch"] || job["date"]),
+          tags: Array(job["tags"]),
+          description: job["description"],
+          raw: job
+        }
+      end
+
+      def normalize_html_row(row)
+        id = row["data-jobid"].to_s
+        href = row.at_css("a[href*='/#{id}']")&.[]("href") || row["onclick"].to_s[/['"]([^'"]+\/#{Regexp.escape(id)})['"]/, 1]
+        return nil if id.empty? || href.to_s.empty?
+
+        url = URI.join("https://web3.career", href).to_s
+        title = row.at_css("h2")&.text.to_s.strip
+        company = row.at_css("h3")&.text.to_s.strip
+        location = row.css("td.job-location-mobile a[href*='web3-jobs']").map { |link| link.text.strip }.reject(&:empty?).join(", ")
+        salary = row.at_css(".text-salary")&.text.to_s.gsub(/\s+/, " ").strip
+        tags = row.css(".my-badge a").map { |link| link.text.strip }.reject(&:empty?).uniq
+
+        {
+          source_key: id,
+          title: title,
+          company: company,
+          location: location,
+          remote: location.match?(/remote/i) || tags.any? { |tag| tag.match?(/remote/i) } ? true : nil,
+          employment_type: nil,
+          category: "Web3",
+          salary: salary.empty? ? nil : salary,
+          source_url: url,
+          published_at: parse_time(row.at_css("time")&.[]("datetime")),
+          tags: tags,
+          description: nil,
+          raw: { "id" => id, "url" => url, "tags" => tags }
+        }
+      end
+
+      def salary_text(min, max, currency, unit)
+        values = [min, max].compact
+        return nil if values.empty?
+
+        prefix = currency.to_s.empty? ? nil : currency
+        range = values.uniq.join(" - ")
+        [prefix, range, unit].compact.reject(&:empty?).join(" ")
+      end
+
+      def get_html(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+          request["Accept"] = "text/html,application/xhtml+xml"
+          request["Accept-Language"] = "en-US,en;q=0.9"
+          request["Referer"] = "https://web3.career/"
+          http.request(request)
+        end
+
+        return get_html(URI.join(url, response["location"]).to_s) if response.is_a?(Net::HTTPRedirection) && response["location"]
+        return get_plain_html(url) if response.code.to_i == 403
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      end
+
+      def get_plain_html(url)
+        response = Net::HTTP.get_response(URI(url))
+        return get_plain_html(URI.join(url, response["location"]).to_s) if response.is_a?(Net::HTTPRedirection) && response["location"]
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      end
+
+      def get_json(url)
+        JSON.parse(get(url, accept: "application/json"))
+      end
+
+      def get(url, accept:)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+          request["Accept"] = accept
+          request["Accept-Language"] = "en-US,en;q=0.9"
+          request["Referer"] = "https://web3.career/"
+          http.request(request)
+        end
+
+        return get(URI.join(url, response["location"]).to_s, accept: accept) if response.is_a?(Net::HTTPRedirection) && response["location"]
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      end
+    end
+
     class BrowserJobPosting < Base
       DEFAULT_SEEDS = [
         "https://jobs.ashbyhq.com/openai",
@@ -1929,6 +2242,7 @@ module Standalone
       Sources::RemoteJobs,
       Sources::Himalayas,
       Sources::Jobicy,
+      Sources::Web3Career,
       Sources::Greenhouse,
       Sources::Lever,
       Sources::Ashby,
