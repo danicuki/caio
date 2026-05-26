@@ -30,6 +30,15 @@ class CreateCrawlerTables < ActiveRecord::Migration[8.1]
       t.text :tags_json
       t.text :description
       t.text :raw_json
+      t.float :salary_min
+      t.float :salary_max
+      t.string :salary_currency
+      t.string :salary_period
+      t.string :location_city
+      t.string :location_state
+      t.string :location_country
+      t.string :location_continent
+      t.string :location_scope
       t.timestamps
     end
 
@@ -52,4 +61,3 @@ class CreateCrawlerTables < ActiveRecord::Migration[8.1]
     end
   end
 end
-
