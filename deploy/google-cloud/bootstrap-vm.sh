@@ -8,13 +8,22 @@ fi
 
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  autoconf \
+  automake \
   build-essential \
   ca-certificates \
   caddy \
   curl \
   git \
+  libffi-dev \
+  libgdbm-dev \
+  libgmp-dev \
+  libncurses-dev \
+  libreadline-dev \
+  libsqlite3-dev \
   libssl-dev \
   libyaml-dev \
+  m4 \
   pkg-config \
   redis-server \
   sqlite3 \
@@ -40,10 +49,16 @@ if [[ -b /dev/disk/by-id/google-caio-data ]] && ! findmnt /var/lib/caio >/dev/nu
 fi
 
 sudo -iu caio bash <<'MiseInstall'
-if ! command -v mise >/dev/null 2>&1; then
+MISE_BIN="$HOME/.local/bin/mise"
+
+if ! command -v mise >/dev/null 2>&1 && [[ ! -x "$MISE_BIN" ]]; then
   curl https://mise.run | sh
   echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> "$HOME/.bashrc"
 fi
+
+"$MISE_BIN" install erlang@26.2.5.17 elixir@1.17.2-otp-26 ruby@3.4.8
+"$MISE_BIN" use -g erlang@26.2.5.17 elixir@1.17.2-otp-26 ruby@3.4.8
+"$MISE_BIN" exec erlang@26.2.5.17 elixir@1.17.2-otp-26 ruby@3.4.8 -- bash -lc 'mix --version && ruby --version'
 MiseInstall
 
 curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh

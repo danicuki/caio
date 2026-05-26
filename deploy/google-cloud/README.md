@@ -61,6 +61,16 @@ On the VM, run the bootstrap script from this repository:
 sudo bash deploy/google-cloud/bootstrap-vm.sh
 ```
 
+The bootstrap installs system packages, `mise`, Erlang, Elixir, Ruby, Redis,
+Caddy, and the Google Cloud Ops Agent. `mix` is installed for the `caio` user,
+not root. Check it with:
+
+```sh
+sudo -iu caio
+mix --version
+ruby --version
+```
+
 Then create `/etc/caio/caio.env` from the example:
 
 ```sh
@@ -100,11 +110,12 @@ git clone https://github.com/danicuki/caio.git /srv/caio
 cd /srv/caio
 ```
 
-Install runtime versions with `mise`:
+Confirm runtime versions with `mise`:
 
 ```sh
 mise install
-mise use -g erlang@26.2.5.17 elixir@1.17.2-otp-26 ruby@3.4.8
+mix --version
+ruby --version
 ```
 
 Install dependencies and build:
