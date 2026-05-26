@@ -23,7 +23,11 @@
         <%= if Map.get(section, :links) do %>
           <div class="static-links">
             <%= for link <- section.links do %>
-              <a href={link.href} target={if String.starts_with?(link.href, "http"), do: "_blank"} rel={if String.starts_with?(link.href, "http"), do: "noreferrer"}>
+              <a
+                href={link.href}
+                target={if String.starts_with?(link.href, "http"), do: "_blank"}
+                rel={if String.starts_with?(link.href, "http"), do: "noreferrer"}
+              >
                 {link.label}
               </a>
             <% end %>

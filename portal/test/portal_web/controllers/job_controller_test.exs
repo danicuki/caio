@@ -28,6 +28,7 @@ defmodule PortalWeb.JobControllerTest do
     assert response =~ "id=\"apply-profile\""
     assert response =~ "class=\"profile-modal\""
     assert response =~ "name=\"lead[email]\""
+    assert response =~ "Senior Elixir Engineer at Caio Labs"
     assert response =~ "/auth/github?apply_job_id=#{job.id}"
     assert response =~ "Continue to application"
     refute response =~ "Continue with Google"

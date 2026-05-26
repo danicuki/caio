@@ -40,8 +40,9 @@ portal/*.ez
 portal/portal-*.tar
 portal/priv/static/assets/
 portal/priv/static/cache_manifest.json
+portal/priv/static/**/*.gz
+portal/priv/static/**/*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.*
 portal/assets/node_modules/
 portal/npm-debug.log
 portal/*.db
 portal/*.db-*
-

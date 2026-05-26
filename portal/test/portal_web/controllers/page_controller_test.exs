@@ -3,7 +3,12 @@ defmodule PortalWeb.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "The next job you'll actually want is in here somewhere."
+    response = html_response(conn, 200)
+
+    assert response =~ "The next job you'll actually want is in here somewhere."
+    assert response =~ ~s(<meta property="og:title")
+    assert response =~ "caio-social-preview.png"
+    assert response =~ ~s(<link rel="canonical" href="https://caio-jobs.com/")
   end
 
   test "GET /about", %{conn: conn} do
@@ -25,7 +30,10 @@ defmodule PortalWeb.PageControllerTest do
 
   test "GET /privacy", %{conn: conn} do
     conn = get(conn, ~p"/privacy")
-    assert html_response(conn, 200) =~ "Privacy policy"
+    response = html_response(conn, 200)
+
+    assert response =~ "Privacy policy"
+    assert response =~ "Session replay may be enabled"
   end
 
   test "GET /terms", %{conn: conn} do
@@ -41,5 +49,19 @@ defmodule PortalWeb.PageControllerTest do
   test "GET /changelog redirects to GitHub commit history", %{conn: conn} do
     conn = get(conn, ~p"/changelog")
     assert redirected_to(conn, 302) == "https://github.com/danicuki/caio/commits/main"
+  end
+
+  test "GET /robots.txt exposes the sitemap", %{conn: conn} do
+    conn = get(conn, "/robots.txt")
+    assert text_response(conn, 200) =~ "Sitemap: https://caio-jobs.com/sitemap.xml"
+  end
+
+  test "GET /sitemap.xml lists core launch pages", %{conn: conn} do
+    conn = get(conn, "/sitemap.xml")
+    response = response(conn, 200)
+
+    assert response =~ "https://caio-jobs.com/"
+    assert response =~ "https://caio-jobs.com/jobs"
+    assert response =~ "https://caio-jobs.com/privacy"
   end
 end

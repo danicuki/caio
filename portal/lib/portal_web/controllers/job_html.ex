@@ -12,8 +12,34 @@ defmodule PortalWeb.JobHTML do
     ~H"""
     <nav class={["topbar", @compact && "compact"]}>
       <a href={~p"/"} class="brand" aria-label="Caio home">
-        <span class="brand-mark">C</span>
-        <span>Caio</span>
+        <svg
+          class="brand-wordmark"
+          viewBox="0 0 188 72"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <text
+            x="0"
+            y="58"
+            fill="currentColor"
+            font-family="Georgia, Times New Roman, serif"
+            font-size="62"
+            font-weight="400"
+            letter-spacing="-1.6"
+          >
+            caıo
+          </text>
+          <path d="M52 20a12 12 0 0 1 24 0Z" fill="var(--green)" />
+          <line
+            x1="48"
+            y1="20"
+            x2="80"
+            y2="20"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+        </svg>
       </a>
       <div id="site-nav-menu" class="nav-menu">
         <div class="nav-links">
@@ -126,7 +152,12 @@ defmodule PortalWeb.JobHTML do
     assigns = assign(assigns, :form_action, assigns.action || ~p"/leads")
 
     ~H"""
-    <form action={@form_action} method="post" class={["lead-form", "lead-form-#{@variant}"]}>
+    <form
+      action={@form_action}
+      method="post"
+      class={["lead-form", "lead-form-#{@variant}", "ph-no-capture"]}
+      data-ph-no-capture
+    >
       <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
       <%= if @return_to do %>
         <input type="hidden" name="lead[return_to]" value={@return_to} />
@@ -137,24 +168,37 @@ defmodule PortalWeb.JobHTML do
       <div class="form-divider"><span>or</span></div>
       <label>
         <span>Email</span>
-        <input name="lead[email]" type="email" placeholder="you@example.com" required />
+        <input
+          name="lead[email]"
+          type="email"
+          placeholder="you@example.com"
+          required
+          data-ph-no-capture
+        />
       </label>
       <%= if @include_profile_fields do %>
         <label>
           <span>LinkedIn URL</span>
-          <input name="lead[linkedin_url]" type="url" placeholder="Optional profile link" />
+          <input
+            name="lead[linkedin_url]"
+            type="url"
+            placeholder="Optional profile link"
+            data-ph-no-capture
+          />
         </label>
         <input
           name="lead[target_role]"
           type="text"
           value={@params["role"] || @params["q"]}
           placeholder="Target role"
+          data-ph-no-capture
         />
         <input
           name="lead[target_location]"
           type="text"
           value={@params["location"]}
           placeholder="Target location"
+          data-ph-no-capture
         />
       <% end %>
       <label class="checkbox-line">
@@ -184,7 +228,7 @@ defmodule PortalWeb.JobHTML do
         <span class="eyebrow">Free. 20 seconds. No password.</span>
         <strong>See every match in this search.</strong>
         <p>
-          Create a free Caio profile to unlock hidden roles, keep your search signal, and get sharper job recommendations.
+          Create a free Caio profile to unlock the full index and keep your job-search signal for future recommendations.
         </p>
         <a href="#unlock" class="primary-button">Unlock free search</a>
       </section>
@@ -206,9 +250,9 @@ defmodule PortalWeb.JobHTML do
   attr :benefits, :list,
     default: [
       "Unlimited search and filters",
-      "Save jobs and searches",
-      "Daily digest of new matches",
-      "First access to new tools"
+      "Target role and location signal",
+      "Original source links stay visible",
+      "First access to the application-agent tools"
     ]
 
   def profile_modal(assigns) do
@@ -224,7 +268,7 @@ defmodule PortalWeb.JobHTML do
       <div class="profile-modal-card">
         <div class="profile-modal-pitch">
           <div class="profile-modal-brand">
-            <span class="footer-dot"></span>
+            <img src={~p"/images/caio-mark-light.svg"} alt="" />
             <span>caio</span>
           </div>
           <div>
@@ -245,7 +289,7 @@ defmodule PortalWeb.JobHTML do
         <div class="profile-modal-form">
           <a href="#" class="modal-close" aria-label="Close profile form">Close</a>
           <h3>Create your free profile</h3>
-          <p>We'll email you a sign-in link. No password, no setup.</p>
+          <p>Continue with GitHub or email. No password, no setup.</p>
           <.lead_form
             action={@action}
             return_to={@return_to}
@@ -286,12 +330,11 @@ defmodule PortalWeb.JobHTML do
       <div class="site-footer-inner">
         <div class="footer-brand">
           <a href={~p"/"} class="footer-wordmark" aria-label="Caio home">
-            <span class="footer-dot"></span>
+            <img src={~p"/images/caio-mark-light.svg"} alt="" />
             <span>caio</span>
           </a>
           <p>
-            A search engine for tech jobs. Hundreds of thousands of roles indexed from across
-            the web, refreshed every hour.
+            A cleaner search engine for public tech jobs. The application-agent product comes next.
           </p>
         </div>
 

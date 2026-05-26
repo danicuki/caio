@@ -4,8 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="Caio" suffix=" · Fast tech job search" phx-no-format>{assigns[:page_title]}</.live_title>
+    <meta name="description" content={PortalWeb.PageHTML.meta_description(assigns)} />
+    <meta name="theme-color" content="#0E5C49" />
+    <link rel="canonical" href={PortalWeb.PageHTML.canonical_url(assigns)} />
+    <meta property="og:site_name" content="Caio" />
+    <meta property="og:type" content={assigns[:og_type] || "website"} />
+    <meta property="og:title" content={PortalWeb.PageHTML.meta_title(assigns)} />
+    <meta property="og:description" content={PortalWeb.PageHTML.meta_description(assigns)} />
+    <meta property="og:url" content={PortalWeb.PageHTML.canonical_url(assigns)} />
+    <meta property="og:image" content={PortalWeb.PageHTML.og_image_url(assigns)} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={PortalWeb.PageHTML.meta_title(assigns)} />
+    <meta name="twitter:description" content={PortalWeb.PageHTML.meta_description(assigns)} />
+    <meta name="twitter:image" content={PortalWeb.PageHTML.og_image_url(assigns)} />
+    <.live_title default="Caio" suffix=" · Caio" phx-no-format>{assigns[:page_title]}</.live_title>
+    <link rel="icon" href={~p"/images/caio-mark.svg"} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={~p"/images/caio-apple-touch.png"} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <%= if posthog_config = Portal.Analytics.browser_config() do %>
+      <script>
+        window.caioPosthogConfig = <%= raw(Jason.encode!(posthog_config)) %>;
+      </script>
+    <% end %>
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
     <script>
@@ -29,14 +49,17 @@
             .querySelectorAll("button[data-phx-theme]")
             .forEach((el) => {
               el.addEventListener("click", () => {
-                setTheme(el.dataset.phxTheme)
+                setTheme(el.dataset.phxTheme);
+                if (window.posthog && window.posthog.capture) {
+                  window.posthog.capture("theme_changed", { theme: el.dataset.phxTheme });
+                }
               })
             })
         })
       })();
     </script>
   </head>
-  <body>
+  <body data-analytics-distinct-id={assigns[:analytics_distinct_id]}>
     {@inner_content}
     <.flash_group flash={@flash} />
   </body>

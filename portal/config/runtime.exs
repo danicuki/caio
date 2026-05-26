@@ -23,6 +23,12 @@ end
 config :portal, PortalWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+config :portal, :posthog,
+  public_key: System.get_env("POSTHOG_PUBLIC_KEY"),
+  host: System.get_env("POSTHOG_HOST", "https://us.i.posthog.com"),
+  enabled: System.get_env("POSTHOG_ENABLED", "false") in ["1", "true", "TRUE", "yes"],
+  session_replay: System.get_env("POSTHOG_SESSION_REPLAY", "true") in ["1", "true", "TRUE", "yes"]
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||

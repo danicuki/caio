@@ -1,16 +1,28 @@
 defmodule PortalWeb.PageController do
   use PortalWeb, :controller
 
-  alias Portal.{Accounts, Jobs}
+  alias Portal.{Accounts, Analytics, Jobs}
 
   def home(conn, _params) do
+    conn = ensure_session_token(conn)
     sample_jobs = Jobs.sample(6)
     total_jobs = Jobs.total_count()
+    lead = current_lead(conn)
+
+    Analytics.capture("home_viewed", analytics_id(conn, lead), %{
+      total_jobs: total_jobs,
+      sample_count: length(sample_jobs)
+    })
 
     render(conn, :home,
+      page_title: "Cleaner tech job search",
+      meta_description:
+        "Search hundreds of thousands of public tech jobs on Caio with cleaner company, salary, location, and source signals.",
+      canonical_path: "/",
+      analytics_distinct_id: analytics_id(conn, lead),
       sample_jobs: sample_jobs,
       total_jobs: total_jobs,
-      lead: current_lead(conn)
+      lead: lead
     )
   end
 
@@ -125,6 +137,11 @@ defmodule PortalWeb.PageController do
             "We use this information to unlock the job index, remember your search preferences, improve recommendations, and contact you about relevant job-search help when you opt in."
         },
         %{
+          title: "Analytics",
+          body:
+            "Caio uses product analytics to understand search, unlock, login, and apply-click behavior. Session replay may be enabled to find usability issues, with form inputs and personal details masked."
+        },
+        %{
           title: "Job and application data",
           body:
             "When you continue to an application, Caio stores your email if needed, records the job, source URL, session, and lead, then redirects you to the original posting. Caio does not submit applications for you in the current product."
@@ -220,8 +237,35 @@ defmodule PortalWeb.PageController do
   end
 
   defp render_static(conn, assigns) do
-    render(conn, :static, Keyword.put(assigns, :lead, current_lead(conn)))
+    conn = ensure_session_token(conn)
+    lead = current_lead(conn)
+    page_title = Keyword.fetch!(assigns, :page_title)
+
+    Analytics.capture("static_page_viewed", analytics_id(conn, lead), %{
+      page_title: page_title,
+      path: Phoenix.Controller.current_path(conn)
+    })
+
+    render(
+      conn,
+      :static,
+      assigns
+      |> Keyword.put(:lead, lead)
+      |> Keyword.put(:analytics_distinct_id, analytics_id(conn, lead))
+      |> Keyword.put_new(:meta_description, Keyword.fetch!(assigns, :intro))
+      |> Keyword.put_new(:canonical_path, Phoenix.Controller.current_path(conn))
+    )
   end
 
   defp current_lead(conn), do: Accounts.get_lead(get_session(conn, :lead_id))
+
+  defp ensure_session_token(conn) do
+    case get_session(conn, :session_token) do
+      nil -> put_session(conn, :session_token, Ecto.UUID.generate())
+      _ -> conn
+    end
+  end
+
+  defp analytics_id(conn, nil), do: "session:#{get_session(conn, :session_token)}"
+  defp analytics_id(conn, lead), do: "lead:#{lead.id}:#{get_session(conn, :session_token)}"
 end

@@ -1,15 +1,22 @@
 defmodule PortalWeb.AuthController do
   use PortalWeb, :controller
 
+  alias Portal.Analytics
   alias Portal.Accounts
   alias Portal.GitHubOAuth
   alias Portal.Jobs
 
   def github(conn, params) do
     if GitHubOAuth.configured?() do
+      conn = ensure_session_token(conn)
       state = Ecto.UUID.generate()
       return_to = safe_return_to(params["return_to"])
       apply_job_id = params["apply_job_id"]
+
+      Analytics.capture("github_login_started", "session:#{get_session(conn, :session_token)}", %{
+        return_to: return_to,
+        apply_job_id: apply_job_id
+      })
 
       conn
       |> put_session(:github_oauth_state, state)
@@ -17,6 +24,8 @@ defmodule PortalWeb.AuthController do
       |> put_session(:github_apply_job_id, apply_job_id)
       |> redirect(external: github_authorize_url(conn, state))
     else
+      Analytics.capture("github_login_not_configured", get_session(conn, :session_token), %{})
+
       conn
       |> put_flash(:error, "GitHub login is not configured yet.")
       |> redirect(to: safe_return_to(params["return_to"]))
@@ -27,19 +36,37 @@ defmodule PortalWeb.AuthController do
     with true <- valid_state?(conn, state),
          {:ok, profile} <- GitHubOAuth.exchange_code(code, github_redirect_uri(conn)),
          {:ok, lead} <- Accounts.upsert_lead(%{"email" => profile.email}) do
-      conn
-      |> delete_session(:github_oauth_state)
-      |> put_session(:lead_id, lead.id)
-      |> ensure_session_token()
-      |> continue_after_github(lead)
+      conn =
+        conn
+        |> delete_session(:github_oauth_state)
+        |> put_session(:lead_id, lead.id)
+        |> ensure_session_token()
+
+      Analytics.capture("github_login_completed", analytics_id(conn, lead), %{
+        has_apply_job_id: present?(get_session(conn, :github_apply_job_id))
+      })
+
+      continue_after_github(conn, lead)
     else
       false ->
+        Analytics.capture("github_login_failed", get_session(conn, :session_token), %{
+          reason: "state"
+        })
+
         github_error(conn, "GitHub login expired. Please try again.")
 
       {:error, message} when is_binary(message) ->
+        Analytics.capture("github_login_failed", get_session(conn, :session_token), %{
+          reason: message
+        })
+
         github_error(conn, message)
 
       {:error, changeset} ->
+        Analytics.capture("github_login_failed", get_session(conn, :session_token), %{
+          reason: "lead_validation"
+        })
+
         github_error(conn, first_error(changeset))
     end
   end
@@ -94,6 +121,13 @@ defmodule PortalWeb.AuthController do
       source_url: job.source_url
     })
 
+    Analytics.capture("job_apply_clicked", analytics_id(conn, lead), %{
+      job_id: job.id,
+      source: job.source,
+      company: job.company,
+      via_github: true
+    })
+
     conn
     |> delete_session(:github_return_to)
     |> delete_session(:github_apply_job_id)
@@ -127,6 +161,10 @@ defmodule PortalWeb.AuthController do
       _ -> conn
     end
   end
+
+  defp analytics_id(conn, lead), do: "lead:#{lead.id}:#{get_session(conn, :session_token)}"
+
+  defp present?(value), do: is_binary(value) && String.trim(value) != ""
 
   defp first_error(changeset) do
     {field, {message, _}} = List.first(changeset.errors)

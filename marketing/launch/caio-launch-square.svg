@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Caio launch post">
+  <rect width="1080" height="1080" fill="#F6F2E9"/>
+  <circle cx="898" cy="172" r="270" fill="#F4E5CB"/>
+  <circle cx="166" cy="924" r="250" fill="#E2EBE3"/>
+  <g transform="translate(86 90)">
+    <rect width="84" height="84" rx="22" fill="#EFEADE" stroke="rgba(22,26,23,0.12)" stroke-width="2"/>
+    <line x1="20" y1="57" x2="64" y2="57" stroke="#161A17" stroke-width="5" stroke-linecap="round"/>
+    <path d="M24 57a18 18 0 0 1 36 0Z" fill="#0E5C49"/>
+    <text x="110" y="60" fill="#161A17" font-family="Georgia, serif" font-size="64">caio</text>
+  </g>
+  <text x="86" y="392" fill="#161A17" font-family="Georgia, serif" font-size="92">Cleaner tech</text>
+  <text x="86" y="492" fill="#161A17" font-family="Georgia, serif" font-size="92">job search.</text>
+  <text x="90" y="590" fill="#2E332E" font-family="Inter, Arial, sans-serif" font-size="34">Public roles with better salary,</text>
+  <text x="90" y="638" fill="#2E332E" font-family="Inter, Arial, sans-serif" font-size="34">location, company, and source signals.</text>
+  <g transform="translate(90 764)">
+    <rect width="280" height="68" rx="18" fill="#0E5C49"/>
+    <text x="30" y="44" fill="#FBF9F3" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700">caio-jobs.com</text>
+  </g>
+  <text x="90" y="930" fill="#6A6E66" font-family="Inter, Arial, sans-serif" font-size="24">Job search today. Application agent next.</text>
+</svg>

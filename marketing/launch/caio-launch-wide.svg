@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="Caio launch post">
+  <rect width="1600" height="900" fill="#14201B"/>
+  <circle cx="1340" cy="140" r="310" fill="rgba(79,205,168,0.16)"/>
+  <circle cx="1190" cy="740" r="260" fill="rgba(229,161,85,0.12)"/>
+  <g transform="translate(98 90)">
+    <rect width="78" height="78" rx="20" fill="#1F2D26" stroke="rgba(236,230,216,0.16)" stroke-width="2"/>
+    <line x1="19" y1="53" x2="59" y2="53" stroke="#ECE6D8" stroke-width="5" stroke-linecap="round"/>
+    <path d="M23 53a16 16 0 0 1 32 0Z" fill="#4FCDA8"/>
+    <text x="104" y="57" fill="#ECE6D8" font-family="Georgia, serif" font-size="62">caio</text>
+  </g>
+  <text x="100" y="350" fill="#ECE6D8" font-family="Georgia, serif" font-size="96">Tech job search,</text>
+  <text x="100" y="456" fill="#4FCDA8" font-family="Georgia, serif" font-size="96" font-style="italic">with less noise.</text>
+  <text x="104" y="548" fill="#C9C3B5" font-family="Inter, Arial, sans-serif" font-size="34">Search public roles with cleaner company, salary,</text>
+  <text x="104" y="598" fill="#C9C3B5" font-family="Inter, Arial, sans-serif" font-size="34">location, and source signals.</text>
+  <g transform="translate(104 710)">
+    <rect width="290" height="66" rx="18" fill="#EDE3CC"/>
+    <text x="30" y="43" fill="#14201B" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700">caio-jobs.com</text>
+  </g>
+  <g transform="translate(1030 216)">
+    <rect width="390" height="360" rx="26" fill="#1F2D26" stroke="rgba(236,230,216,0.12)" stroke-width="2"/>
+    <text x="36" y="66" fill="#8C8F84" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">LIVE SEARCH</text>
+    <text x="36" y="150" fill="#ECE6D8" font-family="Georgia, serif" font-size="58">374k+ roles</text>
+    <line x1="36" y1="190" x2="354" y2="190" stroke="rgba(236,230,216,0.12)" stroke-width="2"/>
+    <text x="36" y="244" fill="#C9C3B5" font-family="Inter, Arial, sans-serif" font-size="24">Remote-friendly filters</text>
+    <text x="36" y="292" fill="#C9C3B5" font-family="Inter, Arial, sans-serif" font-size="24">Original source links</text>
+    <text x="36" y="340" fill="#C9C3B5" font-family="Inter, Arial, sans-serif" font-size="24">Agent workflow next</text>
+  </g>
+</svg>
