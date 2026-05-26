@@ -1,5 +1,5 @@
 <main class="site-shell detail-shell">
-  <.site_nav active="jobs" compact />
+  <.site_nav active="jobs" compact lead={@lead} />
 
   <article class="job-detail-layout">
     <section class="job-detail-main">
@@ -17,11 +17,18 @@
         <.metadata_row job={@job} />
         <.tag_list tags={job_tags(@job)} />
 
-        <form action={~p"/jobs/#{@job.id}/apply"} method="post" class="apply-form">
-          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-          <button class="apply-button primary-button" type="submit">Apply to job</button>
-          <span>Records your interest, then opens the original posting.</span>
-        </form>
+        <%= if @lead do %>
+          <form action={~p"/jobs/#{@job.id}/apply"} method="post" class="apply-form">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <button class="apply-button primary-button" type="submit">Apply to job</button>
+            <span>Records your interest, then opens the original posting.</span>
+          </form>
+        <% else %>
+          <div class="apply-form apply-form-gated">
+            <a href="#apply-profile" class="apply-button primary-button">Continue to application</a>
+            <span>Add your email once, then Caio opens the original posting.</span>
+          </div>
+        <% end %>
       </header>
 
       <section class="description-block">
@@ -98,6 +105,35 @@
       </section>
     </aside>
   </article>
+
+  <%= unless @lead do %>
+    <.profile_modal
+      id="unlock"
+      action={~p"/leads"}
+      return_to={~p"/jobs/#{@job.id}"}
+      params={%{}}
+      title="Unlock your"
+      accent="free profile."
+      body="Drop your email once to unlock the full index and keep this role connected to your job-search signal."
+      submit_label="Unlock free profile"
+    />
+
+    <.profile_modal
+      id="apply-profile"
+      action={~p"/jobs/#{@job.id}/apply"}
+      title="One step before"
+      accent="the application."
+      body="Drop your email so Caio can record the role you opened and connect future job recommendations to your profile."
+      submit_label="Continue to application"
+      include_profile_fields={false}
+      benefits={[
+        "Records this role in your Caio profile",
+        "Unlocks the full search index",
+        "Keeps future recommendations connected",
+        "No password required"
+      ]}
+    />
+  <% end %>
 
   <PortalWeb.JobHTML.footer />
 </main>

@@ -1,5 +1,5 @@
 <main class="site-shell landing-shell">
-  <PortalWeb.JobHTML.site_nav active="home" />
+  <PortalWeb.JobHTML.site_nav active="home" lead={@lead} />
 
   <section class="hero-band">
     <div class="hero-grid">
@@ -98,6 +98,19 @@
       <p>When postings include compensation, Caio keeps it visible instead of buried in prose.</p>
     </article>
   </section>
+
+  <%= unless @lead do %>
+    <PortalWeb.JobHTML.profile_modal
+      id="unlock"
+      action={~p"/leads"}
+      return_to={~p"/"}
+      params={%{}}
+      title="Unlock your"
+      accent="free profile."
+      body="Drop your email once to unlock the full index and keep your job-search signal."
+      submit_label="Unlock free profile"
+    />
+  <% end %>
 
   <PortalWeb.JobHTML.footer />
 </main>

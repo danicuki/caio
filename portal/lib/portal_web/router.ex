@@ -25,10 +25,13 @@ defmodule PortalWeb.Router do
     get "/terms", PageController, :terms
     get "/status", PageController, :status
     get "/changelog", PageController, :changelog
+    get "/auth/github", AuthController, :github
+    get "/auth/github/callback", AuthController, :github_callback
     get "/jobs", JobController, :index
     get "/jobs/:id", JobController, :show
     post "/jobs/:id/apply", JobController, :apply
     post "/leads", LeadController, :create
+    post "/logout", LeadController, :delete
   end
 
   # Other scopes may use custom stacks.

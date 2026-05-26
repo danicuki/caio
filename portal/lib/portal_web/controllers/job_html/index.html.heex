@@ -1,5 +1,5 @@
 <main class="site-shell results-shell">
-  <.site_nav active="jobs" compact count={"#{@total} matching jobs"} />
+  <.site_nav active="jobs" compact count={"#{@total} matching jobs"} lead={@lead} />
 
   <section class="search-command">
     <div>
@@ -31,7 +31,7 @@
     <span>Senior</span>
   </div>
 
-  <section class="results-layout">
+  <section id="results" class="results-layout">
     <aside class="filter-panel">
       <div class="filter-heading">
         <h2>Filters</h2>
@@ -166,14 +166,16 @@
   </section>
 
   <%= unless @unlocked? do %>
-    <div class="mobile-unlock-sheet">
-      <.unlock_panel
-        lead={@lead}
-        return_to={Phoenix.Controller.current_path(@conn)}
-        params={@params}
-        variant="sheet"
-      />
-    </div>
+    <.profile_modal
+      id="unlock"
+      action={~p"/leads"}
+      return_to={Phoenix.Controller.current_path(@conn)}
+      params={@params}
+      title="More matching jobs"
+      accent="are waiting."
+      body="Drop your email and unlock the deeper index. No tracking pixels, no spam, no recruiter noise."
+      submit_label="Unlock free search"
+    />
   <% end %>
 
   <PortalWeb.JobHTML.footer />

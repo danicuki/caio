@@ -19,6 +19,14 @@ defmodule PortalWeb.LeadController do
     end
   end
 
+  def delete(conn, _params) do
+    conn
+    |> clear_session()
+    |> configure_session(renew: true)
+    |> put_flash(:info, "You are logged out.")
+    |> redirect(to: ~p"/jobs")
+  end
+
   defp ensure_session_token(conn) do
     case get_session(conn, :session_token) do
       nil -> put_session(conn, :session_token, Ecto.UUID.generate())

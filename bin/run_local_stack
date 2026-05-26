@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRAWLER_DIR="$ROOT_DIR/crawler"
 PORTAL_DIR="$ROOT_DIR/portal"
 
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 REDIS_CONTAINER="${REDIS_CONTAINER:-caio-redis}"
 REDIS_IMAGE="${REDIS_IMAGE:-redis:7-alpine}"
 REDIS_PORT="${REDIS_PORT:-6379}"
@@ -199,7 +206,7 @@ fi
 
 if requested portal; then
   start_session "caio_portal" \
-    "cd '$PORTAL_DIR' && PORT='$PORTAL_PORT' mix phx.server"
+    "cd '$PORTAL_DIR' && if [ -f '$ROOT_DIR/.env' ]; then set -a; . '$ROOT_DIR/.env'; set +a; fi && PORT='$PORTAL_PORT' mix phx.server"
 fi
 
 if requested all || requested workers || requested schedulers; then

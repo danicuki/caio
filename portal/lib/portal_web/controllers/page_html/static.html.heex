@@ -1,5 +1,5 @@
 <main class="site-shell static-shell">
-  <PortalWeb.JobHTML.site_nav active="" compact={true} />
+  <PortalWeb.JobHTML.site_nav active="" compact={true} lead={@lead} />
 
   <section class="static-hero">
     <p class="eyebrow">{@eyebrow}</p>
@@ -32,6 +32,19 @@
       </article>
     <% end %>
   </section>
+
+  <%= unless @lead do %>
+    <PortalWeb.JobHTML.profile_modal
+      id="unlock"
+      action={~p"/leads"}
+      return_to={Phoenix.Controller.current_path(@conn)}
+      params={%{}}
+      title="Unlock your"
+      accent="free profile."
+      body="Drop your email once to unlock the full index and keep your job-search signal."
+      submit_label="Unlock free profile"
+    />
+  <% end %>
 
   <PortalWeb.JobHTML.footer />
 </main>

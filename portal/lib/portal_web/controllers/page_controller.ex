@@ -1,12 +1,17 @@
 defmodule PortalWeb.PageController do
   use PortalWeb, :controller
 
-  alias Portal.Jobs
+  alias Portal.{Accounts, Jobs}
 
   def home(conn, _params) do
     sample_jobs = Jobs.sample(6)
     total_jobs = Jobs.total_count()
-    render(conn, :home, sample_jobs: sample_jobs, total_jobs: total_jobs)
+
+    render(conn, :home,
+      sample_jobs: sample_jobs,
+      total_jobs: total_jobs,
+      lead: current_lead(conn)
+    )
   end
 
   def about(conn, _params) do
@@ -122,7 +127,7 @@ defmodule PortalWeb.PageController do
         %{
           title: "Job and application data",
           body:
-            "When you click apply, Caio records the job, source URL, session, and lead if available, then redirects you to the original posting. Caio does not submit applications for you in the current product."
+            "When you continue to an application, Caio stores your email if needed, records the job, source URL, session, and lead, then redirects you to the original posting. Caio does not submit applications for you in the current product."
         },
         %{
           title: "Sharing",
@@ -215,6 +220,8 @@ defmodule PortalWeb.PageController do
   end
 
   defp render_static(conn, assigns) do
-    render(conn, :static, assigns)
+    render(conn, :static, Keyword.put(assigns, :lead, current_lead(conn)))
   end
+
+  defp current_lead(conn), do: Accounts.get_lead(get_session(conn, :lead_id))
 end

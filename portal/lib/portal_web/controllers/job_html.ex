@@ -6,6 +6,7 @@ defmodule PortalWeb.JobHTML do
   attr :active, :string, default: ""
   attr :compact, :boolean, default: false
   attr :count, :any, default: nil
+  attr :lead, :map, default: nil
 
   def site_nav(assigns) do
     ~H"""
@@ -18,7 +19,15 @@ defmodule PortalWeb.JobHTML do
         <div class="nav-links">
           <a href={~p"/jobs"} class={["nav-link", @active == "jobs" && "active"]}>Jobs</a>
           <a href={~p"/jobs?order=random"} class="nav-link">Explore</a>
-          <a href="#unlock" class="nav-cta">Free profile</a>
+          <%= if @lead do %>
+            <span class="nav-pill">Profile active</span>
+            <form action={~p"/logout"} method="post" class="nav-logout-form">
+              <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <button type="submit" class="nav-link nav-logout">Log out</button>
+            </form>
+          <% else %>
+            <a href="#unlock" class="nav-cta">Free profile</a>
+          <% end %>
         </div>
         <div class="theme-toggle" aria-label="Theme">
           <button type="button" data-phx-theme="light">Light</button>
@@ -106,45 +115,53 @@ defmodule PortalWeb.JobHTML do
     """
   end
 
-  attr :return_to, :string, required: true
+  attr :return_to, :string, default: nil
   attr :params, :map, default: %{}
   attr :variant, :string, default: "card"
+  attr :action, :string, default: nil
+  attr :submit_label, :string, default: "Unlock free search"
+  attr :include_profile_fields, :boolean, default: true
 
   def lead_form(assigns) do
+    assigns = assign(assigns, :form_action, assigns.action || ~p"/leads")
+
     ~H"""
-    <form id="unlock" action={~p"/leads"} method="post" class={["lead-form", "lead-form-#{@variant}"]}>
+    <form action={@form_action} method="post" class={["lead-form", "lead-form-#{@variant}"]}>
       <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-      <input type="hidden" name="lead[return_to]" value={@return_to} />
-      <div class="social-row" aria-label="Visual social sign in options">
-        <button type="button">Continue with Google</button>
-        <button type="button">GitHub</button>
+      <%= if @return_to do %>
+        <input type="hidden" name="lead[return_to]" value={@return_to} />
+      <% end %>
+      <div class="social-row" aria-label="Social sign in options">
+        <a href={github_auth_path(@return_to, @action)}>Continue with GitHub</a>
       </div>
-      <div class="form-divider"><span>or unlock with email</span></div>
+      <div class="form-divider"><span>or</span></div>
       <label>
         <span>Email</span>
         <input name="lead[email]" type="email" placeholder="you@example.com" required />
       </label>
-      <label>
-        <span>LinkedIn URL</span>
-        <input name="lead[linkedin_url]" type="url" placeholder="Optional profile link" />
-      </label>
-      <input
-        name="lead[target_role]"
-        type="text"
-        value={@params["role"] || @params["q"]}
-        placeholder="Target role"
-      />
-      <input
-        name="lead[target_location]"
-        type="text"
-        value={@params["location"]}
-        placeholder="Target location"
-      />
+      <%= if @include_profile_fields do %>
+        <label>
+          <span>LinkedIn URL</span>
+          <input name="lead[linkedin_url]" type="url" placeholder="Optional profile link" />
+        </label>
+        <input
+          name="lead[target_role]"
+          type="text"
+          value={@params["role"] || @params["q"]}
+          placeholder="Target role"
+        />
+        <input
+          name="lead[target_location]"
+          type="text"
+          value={@params["location"]}
+          placeholder="Target location"
+        />
+      <% end %>
       <label class="checkbox-line">
         <input name="lead[consent_job_help]" value="true" type="checkbox" />
         <span>Send me relevant role recommendations and job-search help.</span>
       </label>
-      <button type="submit" class="primary-button">Unlock free search</button>
+      <button type="submit" class="primary-button">{@submit_label}</button>
     </form>
     """
   end
@@ -163,16 +180,104 @@ defmodule PortalWeb.JobHTML do
         <p>{@lead.email}</p>
       </div>
     <% else %>
-      <section class={["unlock-box", "unlock-#{@variant}"]}>
+      <section class={["unlock-box", "unlock-#{@variant}", "unlock-cta-box"]}>
         <span class="eyebrow">Free. 20 seconds. No password.</span>
         <strong>See every match in this search.</strong>
         <p>
           Create a free Caio profile to unlock hidden roles, keep your search signal, and get sharper job recommendations.
         </p>
-        <.lead_form return_to={@return_to} params={@params} variant={@variant} />
+        <a href="#unlock" class="primary-button">Unlock free search</a>
       </section>
     <% end %>
     """
+  end
+
+  attr :id, :string, required: true
+  attr :action, :string, required: true
+  attr :return_to, :string, default: nil
+  attr :params, :map, default: %{}
+  attr :eyebrow, :string, default: "Free. 20 seconds. No password."
+  attr :title, :string, required: true
+  attr :accent, :string, default: "are waiting."
+  attr :body, :string, required: true
+  attr :submit_label, :string, required: true
+  attr :include_profile_fields, :boolean, default: true
+
+  attr :benefits, :list,
+    default: [
+      "Unlimited search and filters",
+      "Save jobs and searches",
+      "Daily digest of new matches",
+      "First access to new tools"
+    ]
+
+  def profile_modal(assigns) do
+    ~H"""
+    <section
+      id={@id}
+      class="profile-modal"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby={"#{@id}-title"}
+    >
+      <a href="#" class="profile-modal-scrim" aria-label="Close profile form"></a>
+      <div class="profile-modal-card">
+        <div class="profile-modal-pitch">
+          <div class="profile-modal-brand">
+            <span class="footer-dot"></span>
+            <span>caio</span>
+          </div>
+          <div>
+            <p class="modal-eyebrow">{@eyebrow}</p>
+            <h2 id={"#{@id}-title"}>
+              {@title}<br />
+              <em>{@accent}</em>
+            </h2>
+            <p>{@body}</p>
+          </div>
+          <ul>
+            <%= for benefit <- @benefits do %>
+              <li>{benefit}</li>
+            <% end %>
+          </ul>
+        </div>
+
+        <div class="profile-modal-form">
+          <a href="#" class="modal-close" aria-label="Close profile form">Close</a>
+          <h3>Create your free profile</h3>
+          <p>We'll email you a sign-in link. No password, no setup.</p>
+          <.lead_form
+            action={@action}
+            return_to={@return_to}
+            params={@params}
+            variant="modal"
+            submit_label={@submit_label}
+            include_profile_fields={@include_profile_fields}
+          />
+          <p class="modal-legal">
+            By continuing you agree to our <a href={~p"/terms"}>Terms</a>
+            and <a href={~p"/privacy"}>Privacy Policy</a>. We never share your email with employers.
+          </p>
+        </div>
+      </div>
+    </section>
+    """
+  end
+
+  defp github_auth_path(return_to, action) do
+    query =
+      [{"return_to", return_to || "/jobs"}]
+      |> maybe_put_apply_job_id(action)
+      |> URI.encode_query()
+
+    "/auth/github?#{query}"
+  end
+
+  defp maybe_put_apply_job_id(query, action) do
+    case Regex.run(~r|^/jobs/(\d+)/apply$|, action || "") do
+      [_, id] -> [{"apply_job_id", id} | query]
+      _ -> query
+    end
   end
 
   def footer(assigns) do
