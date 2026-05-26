@@ -38,6 +38,12 @@ class JobPostImportWorker
   private
 
   def database
-    @database ||= Standalone::Database.new(Rails.root.join("db/development.sqlite3").to_s)
+    @database ||= Standalone::Database.new(database_path)
+  end
+
+  def database_path
+    ENV["JOB_CRAWLER_DATABASE"].presence ||
+      ActiveRecord::Base.connection_db_config.database ||
+      Rails.root.join("db/development.sqlite3").to_s
   end
 end
