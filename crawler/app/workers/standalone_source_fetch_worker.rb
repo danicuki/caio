@@ -8,10 +8,19 @@ class StandaloneSourceFetchWorker
   def perform(source_name, params = {})
     params = params.with_indifferent_access
     jobs = fetch(source_name, params)
-    JobPostImportWorker.enqueue(source_name, jobs)
+    JobPostImportWorker.enqueue(import_source_name(source_name), jobs)
   end
 
   private
+
+  def import_source_name(source_name)
+    case source_name
+    when "arbeitnow_url"
+      "arbeitnow"
+    else
+      source_name
+    end
+  end
 
   def fetch(source_name, params)
     case source_name
@@ -25,6 +34,8 @@ class StandaloneSourceFetchWorker
       fetch_web3career(params)
     when "arbeitnow"
       Standalone::Sources::Arbeitnow.new.send(:fetch_pages, start_page: Integer(params.fetch(:page)), max_pages: 1).fetch(:jobs)
+    when "arbeitnow_url"
+      Standalone::Sources::Arbeitnow.new.fetch_url(params.fetch(:url))
     when "themuse"
       category = params[:category]
       category = nil if category.to_s.empty?

@@ -998,6 +998,13 @@ module Standalone
         fetch_pages(start_page: 1, max_pages: 1)[:jobs]
       end
 
+      def fetch_url(url)
+        payload = job_posting_from_html(fetch_html(url))
+        return [] unless payload
+
+        [normalize_detail(payload, url)]
+      end
+
       def fetch_backfill(state)
         return { jobs: [], next_cursor: state[:next_cursor], exhausted: true, last_error: nil } if state[:exhausted]
 
@@ -1048,10 +1055,90 @@ module Standalone
             source_url: job.fetch("url"),
             published_at: parse_time(job["created_at"]),
             tags: job["tags"] || [],
-            description: text(job["description"]),
+            description: html_description(job["description"]),
             raw: job
           }
         end
+      end
+
+      def normalize_detail(job, url)
+        location = job.dig("jobLocation", "address") || {}
+
+        {
+          source_key: source_key(arbeitnow_slug(url), job.dig("identifier", "value"), url, job["title"]),
+          title: job.fetch("title"),
+          company: job.dig("hiringOrganization", "name"),
+          location: [location["addressLocality"], location["addressRegion"], location["addressCountry"]].compact.join(", "),
+          remote: nil,
+          employment_type: job["employmentType"],
+          category: nil,
+          salary: salary_text(job["baseSalary"]),
+          source_url: url,
+          published_at: parse_time(job["datePosted"]),
+          tags: Array(job["skills"]).flat_map { |value| value.to_s.split(",") }.map(&:strip).reject(&:empty?),
+          description: html_description(job["description"]),
+          raw: job.merge("arbeitnow_url" => url)
+        }
+      end
+
+      def job_posting_from_html(html)
+        Nokogiri::HTML(html).css("script[type='application/ld+json']").each do |script|
+          payload = JSON.parse(script.text)
+          posting = find_job_posting(payload)
+          return posting if posting
+        rescue JSON::ParserError
+          next
+        end
+
+        nil
+      end
+
+      def find_job_posting(value)
+        case value
+        when Hash
+          return value if Array(value["@type"]).include?("JobPosting") || value["@type"] == "JobPosting"
+
+          Array(value["@graph"]).filter_map { |entry| find_job_posting(entry) }.first
+        when Array
+          value.filter_map { |entry| find_job_posting(entry) }.first
+        end
+      end
+
+      def salary_text(value)
+        salary = value.is_a?(Hash) ? value : {}
+        amount = salary["value"].is_a?(Hash) ? salary["value"] : {}
+        currency = salary["currency"]
+        min = amount["minValue"]
+        max = amount["maxValue"]
+        unit = amount["unitText"]
+
+        [currency, [min, max].compact.join("-"), unit].reject { |part| part.to_s.empty? }.join(" ")
+      end
+
+      def html_description(value)
+        value.to_s.strip
+      end
+
+      def arbeitnow_slug(url)
+        URI(url).path.split("/").last
+      rescue URI::InvalidURIError
+        nil
+      end
+
+      def fetch_html(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = USER_AGENT
+          request["Accept"] = "text/html"
+          http.request(request)
+        end
+
+        return fetch_html(URI.join(url, response["location"]).to_s) if response.is_a?(Net::HTTPRedirection) && response["location"]
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
       end
     end
 

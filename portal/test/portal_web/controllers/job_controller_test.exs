@@ -34,6 +34,21 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Continue with Google"
   end
 
+  test "GET /jobs/:id preserves structured job description HTML", %{conn: conn} do
+    job =
+      job_fixture(%{
+        description:
+          "<p><strong>Intro</strong></p><h2>Aufgaben</h2><ul><li>Plan systems</li><li>Coordinate teams</li></ul>"
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ "<h2>Aufgaben</h2>"
+    assert response =~ "<ul><li>Plan systems</li><li>Coordinate teams</li></ul>"
+    refute response =~ "Intro Aufgaben Plan systems Coordinate teams"
+  end
+
   test "POST /jobs/:id/apply creates a lead for guest applicants", %{conn: conn} do
     job = job_fixture()
 
@@ -70,7 +85,7 @@ defmodule PortalWeb.JobControllerTest do
     assert interest.lead_id == lead.id
   end
 
-  defp job_fixture do
+  defp job_fixture(attrs \\ %{}) do
     Repo.insert!(%JobPost{
       source: "test",
       source_key: "test-#{System.unique_integer([:positive])}",
@@ -82,6 +97,7 @@ defmodule PortalWeb.JobControllerTest do
       description: "Build useful job search software.",
       created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
       updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    }
+    |> Map.merge(attrs))
   end
 end
