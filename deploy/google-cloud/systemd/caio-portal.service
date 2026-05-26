@@ -1,0 +1,16 @@
+[Unit]
+Description=Caio Phoenix portal
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+User=caio
+Group=caio
+WorkingDirectory=/srv/caio/portal
+EnvironmentFile=/etc/caio/caio.env
+ExecStart=/srv/caio/portal/_build/prod/rel/portal/bin/portal start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

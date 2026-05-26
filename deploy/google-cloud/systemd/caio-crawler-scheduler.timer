@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Caio crawler scheduler every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=caio-crawler-scheduler.service
+
+[Install]
+WantedBy=timers.target

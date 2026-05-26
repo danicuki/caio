@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up Caio SQLite database locally
+
+[Service]
+Type=oneshot
+User=caio
+Group=caio
+EnvironmentFile=/etc/caio/caio.env
+ExecStart=/usr/bin/bash -lc 'mkdir -p /var/lib/caio/backups && sqlite3 "$DATABASE_PATH" ".backup \"/var/lib/caio/backups/caio-$(date +%%F-%%H%%M%%S).sqlite3\"" && find /var/lib/caio/backups -type f -name "caio-*.sqlite3" -mtime +14 -delete'

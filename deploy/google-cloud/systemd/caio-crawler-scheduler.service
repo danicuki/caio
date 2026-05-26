@@ -1,0 +1,12 @@
+[Unit]
+Description=Enqueue Caio crawler scheduler jobs
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=oneshot
+User=caio
+Group=caio
+WorkingDirectory=/srv/caio/crawler
+EnvironmentFile=/etc/caio/caio.env
+ExecStart=/home/caio/.local/bin/mise exec ruby@3.4.8 -- bundle exec rails runner 'SourceFanoutSchedulerWorker.perform_async; LinkedinSchedulerWorker.perform_async'

@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up Caio SQLite database hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=caio-sqlite-backup.service
+
+[Install]
+WantedBy=timers.target

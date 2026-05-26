@@ -1,0 +1,16 @@
+[Unit]
+Description=Caio Sidekiq fetch
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+User=caio
+Group=caio
+WorkingDirectory=/srv/caio/crawler
+EnvironmentFile=/etc/caio/caio.env
+ExecStart=/home/caio/.local/bin/mise exec ruby@3.4.8 -- bundle exec sidekiq -C config/sidekiq_fetch.yml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
