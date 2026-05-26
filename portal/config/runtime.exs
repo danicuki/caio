@@ -29,6 +29,18 @@ config :portal, :posthog,
   enabled: System.get_env("POSTHOG_ENABLED", "false") in ["1", "true", "TRUE", "yes"],
   session_replay: System.get_env("POSTHOG_SESSION_REPLAY", "true") in ["1", "true", "TRUE", "yes"]
 
+config :portal, :founder_chat,
+  enabled: System.get_env("FOUNDER_CHAT_ENABLED", "false") in ["1", "true", "TRUE", "yes"],
+  title: System.get_env("FOUNDER_CHAT_TITLE", "Chat with Daniel"),
+  subtitle: System.get_env("FOUNDER_CHAT_SUBTITLE", "I read these directly in Telegram."),
+  telegram_bot_token: System.get_env("TELEGRAM_BOT_TOKEN"),
+  telegram_chat_id: System.get_env("TELEGRAM_CHAT_ID"),
+  telegram_webhook_secret: System.get_env("TELEGRAM_WEBHOOK_SECRET"),
+  telegram_delivery_enabled:
+    System.get_env("TELEGRAM_DELIVERY_ENABLED", "true") in ["1", "true", "TRUE", "yes"],
+  telegram_forum_topics:
+    System.get_env("TELEGRAM_FORUM_TOPICS", "true") in ["1", "true", "TRUE", "yes"]
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||

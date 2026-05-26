@@ -221,3 +221,142 @@ document.querySelectorAll("a[href^='/auth/github']").forEach((link) => {
 document.querySelectorAll("form[action$='/apply']").forEach((form) => {
   form.addEventListener("submit", () => capture("job_apply_submitted"))
 })
+
+// Founder chat. A tiny polling widget keeps the launch feedback loop direct
+// without requiring Phoenix channels yet.
+document.querySelectorAll("[data-founder-chat]").forEach((widget) => {
+  const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content")
+  const toggle = widget.querySelector("[data-chat-toggle]")
+  const close = widget.querySelector("[data-chat-close]")
+  const panel = widget.querySelector(".founder-chat-panel")
+  const form = widget.querySelector("[data-chat-form]")
+  const textarea = form?.querySelector("textarea[name='body']")
+  const messagesEl = widget.querySelector("[data-chat-messages]")
+  const empty = widget.querySelector(".founder-chat-empty")
+
+  if (!csrfToken || !toggle || !panel || !form || !textarea || !messagesEl) return
+
+  let conversationId = null
+  let lastMessageId = 0
+  let pollTimer = null
+  let starting = null
+
+  widget.hidden = false
+
+  const request = async (path, options = {}) => {
+    const response = await fetch(path, {
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken,
+        ...(options.headers || {}),
+      },
+      ...options,
+    })
+
+    if (!response.ok) throw new Error(`Chat request failed: ${response.status}`)
+    return response.json()
+  }
+
+  const setOpen = async (open) => {
+    widget.classList.toggle("open", open)
+    toggle.setAttribute("aria-expanded", open ? "true" : "false")
+
+    if (open) {
+      await ensureConversation()
+      textarea.focus()
+      startPolling()
+      capture("founder_chat_opened")
+    } else {
+      stopPolling()
+    }
+  }
+
+  const ensureConversation = async () => {
+    if (conversationId) return conversationId
+    if (starting) return starting
+
+    starting = request("/chat/conversations", {
+      method: "POST",
+      body: JSON.stringify({ path: window.location.pathname + window.location.search }),
+    })
+      .then((payload) => {
+        conversationId = payload.conversation?.id
+        appendMessages(payload.messages || [])
+        return conversationId
+      })
+      .finally(() => {
+        starting = null
+      })
+
+    return starting
+  }
+
+  const startPolling = () => {
+    stopPolling()
+    pollTimer = window.setInterval(loadMessages, 2500)
+    loadMessages()
+  }
+
+  const stopPolling = () => {
+    if (pollTimer) window.clearInterval(pollTimer)
+    pollTimer = null
+  }
+
+  const loadMessages = async () => {
+    if (!conversationId) return
+
+    try {
+      const payload = await request(`/chat/messages?after_id=${lastMessageId}`, {
+        method: "GET",
+        headers: { "content-type": "application/json" },
+      })
+      appendMessages(payload.messages || [])
+    } catch (_error) {
+      stopPolling()
+    }
+  }
+
+  const appendMessages = (messages) => {
+    messages.forEach((message) => {
+      if (message.id <= lastMessageId) return
+
+      empty?.remove()
+      lastMessageId = Math.max(lastMessageId, message.id)
+
+      const bubble = document.createElement("div")
+      bubble.className = `founder-chat-message ${message.direction}`
+      bubble.textContent = message.body
+      messagesEl.appendChild(bubble)
+      messagesEl.scrollTop = messagesEl.scrollHeight
+    })
+  }
+
+  toggle.addEventListener("click", () => setOpen(!widget.classList.contains("open")))
+  close?.addEventListener("click", () => setOpen(false))
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const body = textarea.value.trim()
+    if (!body) return
+
+    textarea.value = ""
+    textarea.disabled = true
+
+    try {
+      await ensureConversation()
+      const payload = await request("/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({ message: { body } }),
+      })
+      appendMessages(payload.message ? [payload.message] : [])
+      capture("founder_chat_message_sent")
+      startPolling()
+    } catch (_error) {
+      textarea.value = body
+    } finally {
+      textarea.disabled = false
+      textarea.focus()
+    }
+  })
+})
