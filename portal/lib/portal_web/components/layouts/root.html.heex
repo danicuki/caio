@@ -61,6 +61,41 @@
   </head>
   <body data-analytics-distinct-id={assigns[:analytics_distinct_id]}>
     {@inner_content}
+    <%= if chat_config = Portal.FounderChat.widget_config() do %>
+      <aside
+        class="founder-chat"
+        data-founder-chat
+        data-title={chat_config.title}
+        data-subtitle={chat_config.subtitle}
+        hidden
+      >
+        <button class="founder-chat-button" type="button" data-chat-toggle aria-expanded="false">
+          Chat
+        </button>
+        <section class="founder-chat-panel" aria-label="Founder chat">
+          <header>
+            <div>
+              <strong>{chat_config.title}</strong>
+              <span>{chat_config.subtitle}</span>
+            </div>
+            <button type="button" data-chat-close aria-label="Close chat">×</button>
+          </header>
+          <div class="founder-chat-messages" data-chat-messages>
+            <p class="founder-chat-empty">Ask a question or tell me what feels broken.</p>
+          </div>
+          <form class="founder-chat-form" data-chat-form>
+            <textarea
+              name="body"
+              rows="2"
+              maxlength="4000"
+              placeholder="Type your message..."
+              required
+            ></textarea>
+            <button type="submit">Send</button>
+          </form>
+        </section>
+      </aside>
+    <% end %>
     <.flash_group flash={@flash} />
   </body>
 </html>

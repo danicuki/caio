@@ -14,6 +14,13 @@ defmodule PortalWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :chat_api do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   scope "/", PortalWeb do
     pipe_through :browser
 
@@ -32,6 +39,21 @@ defmodule PortalWeb.Router do
     post "/jobs/:id/apply", JobController, :apply
     post "/leads", LeadController, :create
     post "/logout", LeadController, :delete
+  end
+
+  scope "/", PortalWeb do
+    pipe_through :chat_api
+
+    get "/chat/config", ChatController, :config
+    post "/chat/conversations", ChatController, :create_conversation
+    get "/chat/messages", ChatController, :messages
+    post "/chat/messages", ChatController, :create_message
+  end
+
+  scope "/", PortalWeb do
+    pipe_through :api
+
+    post "/telegram/webhook/:secret", ChatController, :telegram_webhook
   end
 
   # Other scopes may use custom stacks.
