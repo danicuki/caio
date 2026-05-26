@@ -84,7 +84,11 @@ defmodule PortalWeb.PageController do
         %{
           title: "Open source",
           body:
-            "Caio is developed in the open. The changelog links to the public commit history so changes can be inspected directly."
+            "Caio is developed in the open. The changelog links to the public commit history so changes can be inspected directly.",
+          links: [
+            %{label: "Open GitHub repo", href: "https://github.com/danicuki/caio"},
+            %{label: "View changelog", href: "/changelog"}
+          ]
         },
         %{
           title: "Future paid agent",
@@ -166,7 +170,10 @@ defmodule PortalWeb.PageController do
         %{
           title: "Open source",
           body:
-            "Some or all of Caio may be available as open source. Open source code is governed by its repository license; hosted service use is governed by these terms."
+            "Some or all of Caio may be available as open source. Open source code is governed by its repository license; hosted service use is governed by these terms.",
+          links: [
+            %{label: "Open GitHub repo", href: "https://github.com/danicuki/caio"}
+          ]
         }
       ]
     )
@@ -193,7 +200,11 @@ defmodule PortalWeb.PageController do
         %{
           title: "Incidents",
           body:
-            "There is no separate public incident dashboard yet. For now, use the GitHub commit history and local logs as the operational record."
+            "There is no separate public incident dashboard yet. For now, use the GitHub commit history and local logs as the operational record.",
+          links: [
+            %{label: "View commit history", href: "/changelog"},
+            %{label: "Open GitHub repo", href: "https://github.com/danicuki/caio"}
+          ]
         }
       ]
     )

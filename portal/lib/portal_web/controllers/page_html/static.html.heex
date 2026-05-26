@@ -20,6 +20,15 @@
       <article class="static-section">
         <h2>{section.title}</h2>
         <p>{section.body}</p>
+        <%= if Map.get(section, :links) do %>
+          <div class="static-links">
+            <%= for link <- section.links do %>
+              <a href={link.href} target={if String.starts_with?(link.href, "http"), do: "_blank"} rel={if String.starts_with?(link.href, "http"), do: "noreferrer"}>
+                {link.label}
+              </a>
+            <% end %>
+          </div>
+        <% end %>
       </article>
     <% end %>
   </section>

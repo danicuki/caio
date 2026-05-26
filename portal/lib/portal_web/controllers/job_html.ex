@@ -206,6 +206,7 @@ defmodule PortalWeb.JobHTML do
           <a href={~p"/how-it-works"}>How it works</a>
           <a href={~p"/changelog"}>Changelog</a>
           <a href={~p"/pricing"}>Pricing</a>
+          <a href="https://github.com/danicuki/caio" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
 
         <nav class="footer-column" aria-label="Help">

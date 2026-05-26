@@ -18,7 +18,9 @@ defmodule PortalWeb.PageControllerTest do
 
   test "GET /pricing", %{conn: conn} do
     conn = get(conn, ~p"/pricing")
-    assert html_response(conn, 200) =~ "Free while Caio is being built in public."
+    response = html_response(conn, 200)
+    assert response =~ "Free while Caio is being built in public."
+    assert response =~ "https://github.com/danicuki/caio"
   end
 
   test "GET /privacy", %{conn: conn} do
