@@ -178,14 +178,48 @@ defmodule PortalWeb.JobHTML do
   def footer(assigns) do
     ~H"""
     <footer class="site-footer">
-      <div>
-        <strong>Caio</strong>
-        <span>Live tech roles, normalized for people who are tired of noisy boards.</span>
-      </div>
-      <div class="footer-links">
-        <a href={~p"/jobs"}>Jobs</a>
-        <a href={~p"/jobs?order=random"}>Random mix</a>
-        <a href="#unlock">Free profile</a>
+      <div class="site-footer-inner">
+        <div class="footer-brand">
+          <a href={~p"/"} class="footer-wordmark" aria-label="Caio home">
+            <span class="footer-dot"></span>
+            <span>caio</span>
+          </a>
+          <p>
+            A search engine for tech jobs. Hundreds of thousands of roles indexed from across
+            the web, refreshed every hour.
+          </p>
+        </div>
+
+        <nav class="footer-column" aria-label="Search">
+          <h2>Search</h2>
+          <a href={~p"/jobs?role=frontend"}>Frontend</a>
+          <a href={~p"/jobs?role=backend"}>Backend</a>
+          <a href={~p"/jobs?q=machine+learning+data"}>ML & data</a>
+          <a href={~p"/jobs?role=design"}>Design</a>
+          <a href={~p"/jobs?q=devops+sre"}>DevOps & SRE</a>
+          <a href={~p"/jobs?location=remote"}>Remote only</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Caio">
+          <h2>Caio</h2>
+          <a href={~p"/"}>About</a>
+          <a href="#unlock">How it works</a>
+          <a href={~p"/jobs?order=random"}>Changelog</a>
+          <a href="#unlock">Pricing</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Help">
+          <h2>Help</h2>
+          <a href="mailto:hello@caio.jobs">Contact</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#terms">Terms</a>
+          <a href="#status">Status</a>
+        </nav>
+
+        <div class="footer-bottom">
+          <span>© {Date.utc_today().year} Caio</span>
+          <span>Public job data, normalized for quieter search.</span>
+        </div>
       </div>
     </footer>
     """
@@ -227,6 +261,9 @@ defmodule PortalWeb.JobHTML do
   def remote_label(%{remote: 1}), do: "Remote"
   def remote_label(%{location_scope: scope}) when scope in ["remote", "Remote"], do: "Remote"
   def remote_label(_job), do: nil
+
+  def pluralize(1, singular), do: "1 #{singular}"
+  def pluralize(count, singular), do: "#{count || 0} #{singular}s"
 
   def posted_label(%{published_at: value}) when value not in [nil, ""] do
     case Date.from_iso8601(String.slice(value, 0, 10)) do

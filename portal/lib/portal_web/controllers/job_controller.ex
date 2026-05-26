@@ -22,7 +22,13 @@ defmodule PortalWeb.JobController do
 
   def show(conn, %{"id" => id}) do
     job = Jobs.get!(id)
-    render(conn, :show, job: job, lead: current_lead(conn), session_token: session_token(conn))
+
+    render(conn, :show,
+      job: job,
+      company_stats: Jobs.company_stats(job),
+      lead: current_lead(conn),
+      session_token: session_token(conn)
+    )
   end
 
   def apply(conn, %{"id" => id}) do

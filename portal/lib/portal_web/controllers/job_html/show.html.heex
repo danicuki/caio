@@ -58,6 +58,10 @@
             <dt>Compensation</dt>
             <dd>{salary(@job) || "Not listed"}</dd>
           </div>
+          <div>
+            <dt>Open on Caio</dt>
+            <dd>{pluralize(@company_stats.open_jobs_count, "role")}</dd>
+          </div>
         </dl>
       </section>
 
@@ -80,10 +84,16 @@
 
       <section class="side-card stats-card">
         <h2>Company stats</h2>
-        <p>Mock profile data will be replaced by company-level enrichment when available.</p>
+        <p>
+          Live platform signals for {@job.company || "this company"}. External review data can be layered in later from a company profile table.
+        </p>
         <div class="stats-grid">
-          <span><strong>4.1</strong><small>Glassdoor</small></span>
-          <span><strong>18</strong><small>open roles</small></span>
+          <span><strong>{@company_stats.open_jobs_count}</strong><small>open roles</small></span>
+          <span><strong>{@company_stats.source_count}</strong><small>sources</small></span>
+          <span><strong>{@company_stats.location_count}</strong><small>markets</small></span>
+          <span>
+            <strong>{posted_label(%{published_at: @company_stats.latest_posted_at})}</strong><small>latest role</small>
+          </span>
         </div>
       </section>
     </aside>

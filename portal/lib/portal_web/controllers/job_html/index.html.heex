@@ -13,7 +13,12 @@
       </label>
       <label>
         <span>Location</span>
-        <input name="location" type="search" value={@params["location"]} placeholder="remote, London" />
+        <input
+          name="location"
+          type="search"
+          value={@params["location"]}
+          placeholder="remote, London"
+        />
       </label>
       <button type="submit" class="primary-button">Search</button>
     </form>
@@ -36,11 +41,21 @@
       <form action={~p"/jobs"} method="get" class="stack-form">
         <label>
           <span>Role</span>
-          <input name="role" type="search" value={@params["role"]} placeholder="software engineer" />
+          <input
+            name="role"
+            type="search"
+            value={@params["role"]}
+            placeholder="software engineer"
+          />
         </label>
         <label>
           <span>Company</span>
-          <input name="company" type="search" value={@params["company"]} placeholder="stripe, figma" />
+          <input
+            name="company"
+            type="search"
+            value={@params["company"]}
+            placeholder="stripe, figma"
+          />
         </label>
         <label>
           <span>Keyword</span>
@@ -48,7 +63,12 @@
         </label>
         <label>
           <span>Location</span>
-          <input name="location" type="search" value={@params["location"]} placeholder="remote, Europe" />
+          <input
+            name="location"
+            type="search"
+            value={@params["location"]}
+            placeholder="remote, Europe"
+          />
         </label>
         <label>
           <span>Order</span>
@@ -155,4 +175,6 @@
       />
     </div>
   <% end %>
+
+  <PortalWeb.JobHTML.footer />
 </main>

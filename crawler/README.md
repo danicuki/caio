@@ -92,7 +92,9 @@ Included adapters and workers cover sources such as:
 - The Muse public jobs API
 - Remote OK API
 - Himalayas
+- Himalayas search API fanout across role/country filters
 - Remote Jobs
+- Get on Board public API for LATAM tech jobs
 - LinkedIn public guest job search endpoints
 
 Before scaling any source, review its current API terms, attribution requirements, robots.txt, and rate limits. The crawler should degrade gracefully under rate limiting and avoid retry storms.

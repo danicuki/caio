@@ -85,6 +85,35 @@ defmodule Portal.Jobs do
     |> Repo.one!()
   end
 
+  def company_stats(%JobPost{company: company}) when company not in [nil, ""] do
+    company_key = normalize_company(company)
+    cutoff = public_cutoff_date()
+
+    JobPost
+    |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
+    |> where([j], fragment("lower(trim(?))", j.company) == ^company_key)
+    |> where(
+      [j],
+      fragment("COALESCE(NULLIF(?, ''), '9999-12-31') >= ?", j.published_at, ^cutoff)
+    )
+    |> select([j], %{
+      open_jobs_count: count(),
+      source_count: fragment("COUNT(DISTINCT NULLIF(lower(trim(?)), ''))", j.source),
+      location_count: fragment("COUNT(DISTINCT NULLIF(lower(trim(?)), ''))", j.location_country),
+      latest_posted_at: max(j.published_at)
+    })
+    |> Repo.one()
+  end
+
+  def company_stats(_job) do
+    %{
+      open_jobs_count: 0,
+      source_count: 0,
+      location_count: 0,
+      latest_posted_at: nil
+    }
+  end
+
   defp public_scope(query) do
     cutoff = public_cutoff_date()
 
@@ -99,6 +128,13 @@ defmodule Portal.Jobs do
     Date.utc_today()
     |> Date.add(-183)
     |> Date.to_iso8601()
+  end
+
+  defp normalize_company(company) do
+    company
+    |> to_string()
+    |> String.trim()
+    |> String.downcase()
   end
 
   defp select_list_fields(query) do

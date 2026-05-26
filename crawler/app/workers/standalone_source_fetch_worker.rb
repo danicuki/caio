@@ -33,6 +33,12 @@ class StandaloneSourceFetchWorker
       Standalone::Sources::RemoteJobs.new.send(:fetch_pages, offset: Integer(params.fetch(:offset)), max_pages: 1).fetch(:jobs)
     when "himalayas"
       Standalone::Sources::Himalayas.new.send(:fetch_pages, offset: Integer(params.fetch(:offset)), max_pages: 1).fetch(:jobs)
+    when "himalayas_search"
+      fetch_himalayas_search(params)
+    when "getonbrd"
+      query = params[:query].presence || "software engineer"
+      page = Integer(params.fetch(:page, 1))
+      Standalone::Sources::GetOnBoard.new.fetch_query(query: query, page: page, max_pages: 1)
     when "greenhouse"
       source = Standalone::Sources::Greenhouse.new
       board = params.fetch(:board)
@@ -106,6 +112,14 @@ class StandaloneSourceFetchWorker
     else
       raise ArgumentError, "Unknown web3career mode #{mode.inspect}"
     end
+  end
+
+  def fetch_himalayas_search(params)
+    query = params[:query].presence || "software engineer"
+    country = params[:country].presence
+    offset = Integer(params.fetch(:offset, 0))
+
+    Standalone::Sources::HimalayasSearch.new.fetch_query(q: query, country: country, offset: offset, max_pages: 1).fetch(:jobs)
   end
 
   def smartrecruiters_detail(company, id)

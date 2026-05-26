@@ -19,12 +19,17 @@ module Crawler
       def parse_time(value)
         return if value.blank?
 
-        return Time.zone.at(value.to_i) if value.is_a?(Numeric)
-        return Time.zone.at(value.to_i) if value.to_s.match?(/\A\d{10,}\z/)
+        return Time.zone.at(epoch_seconds(value)) if value.is_a?(Numeric)
+        return Time.zone.at(epoch_seconds(value.to_i)) if value.to_s.match?(/\A\d{10,}\z/)
 
         Time.zone.parse(value.to_s)
       rescue ArgumentError
         nil
+      end
+
+      def epoch_seconds(value)
+        number = value.to_i
+        number > 99_999_999_999 ? number / 1000 : number
       end
 
       def compact_record(record)

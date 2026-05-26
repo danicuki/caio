@@ -396,6 +396,20 @@ module Standalone
         CREATE INDEX IF NOT EXISTS index_job_posts_source ON job_posts(source);
         CREATE INDEX IF NOT EXISTS index_job_posts_published_at ON job_posts(published_at);
         CREATE INDEX IF NOT EXISTS index_job_posts_company ON job_posts(company);
+        CREATE INDEX IF NOT EXISTS index_job_posts_normalized_company_public
+          ON job_posts(lower(trim(company)), published_at)
+          WHERE company IS NOT NULL AND trim(company) != '';
+        CREATE INDEX IF NOT EXISTS index_job_posts_normalized_company_active
+          ON job_posts(lower(trim(company)), COALESCE(NULLIF(published_at, ''), '9999-12-31'))
+          WHERE company IS NOT NULL AND trim(company) != '';
+        CREATE INDEX IF NOT EXISTS index_job_posts_normalized_company_source
+          ON job_posts(lower(trim(company)), lower(trim(source)))
+          WHERE company IS NOT NULL AND trim(company) != ''
+            AND source IS NOT NULL AND trim(source) != '';
+        CREATE INDEX IF NOT EXISTS index_job_posts_normalized_company_country
+          ON job_posts(lower(trim(company)), lower(trim(location_country)))
+          WHERE company IS NOT NULL AND trim(company) != ''
+            AND location_country IS NOT NULL AND trim(location_country) != '';
         CREATE INDEX IF NOT EXISTS index_job_posts_location ON job_posts(location);
         CREATE INDEX IF NOT EXISTS index_job_posts_remote ON job_posts(remote);
         CREATE INDEX IF NOT EXISTS index_job_posts_category ON job_posts(category);
@@ -934,12 +948,17 @@ module Standalone
       def parse_time(value)
         return nil if value.nil? || value.to_s.empty?
 
-        return Time.at(value.to_i).utc.iso8601 if value.is_a?(Numeric)
-        return Time.at(value.to_i).utc.iso8601 if value.to_s.match?(/\A\d{10,}\z/)
+        return Time.at(epoch_seconds(value)).utc.iso8601 if value.is_a?(Numeric)
+        return Time.at(epoch_seconds(value.to_i)).utc.iso8601 if value.to_s.match?(/\A\d{10,}\z/)
 
         Time.parse(value.to_s).utc.iso8601
       rescue ArgumentError
         nil
+      end
+
+      def epoch_seconds(value)
+        number = value.to_i
+        number > 99_999_999_999 ? number / 1000 : number
       end
 
       def text(value)
@@ -1261,6 +1280,292 @@ module Standalone
       end
     end
 
+    class HimalayasSearch < Base
+      QUERIES = %w[
+        software engineer developer backend frontend full-stack react node python ruby rails
+        java golang rust elixir data engineer data scientist machine learning ai product manager
+        designer devops sre security mobile android ios qa sales customer success marketing
+      ].freeze
+
+      COUNTRIES = %w[
+        remote united-states canada brazil mexico argentina colombia chile portugal spain
+        united-kingdom germany france netherlands ireland india singapore australia
+      ].freeze
+
+      def name = "himalayas_search"
+
+      def fetch
+        queries.flat_map do |query|
+          fetch_query(q: query, offset: 0, max_pages: Integer(ENV.fetch("HIMALAYAS_SEARCH_PAGES_PER_QUERY", "1")))[:jobs]
+        end.uniq { |job| job[:source_key] }
+      end
+
+      def fetch_backfill(state)
+        return { jobs: [], next_cursor: state[:next_cursor], exhausted: true, last_error: nil } if state[:exhausted]
+
+        query_index, country_index, offset = parse_cursor(state[:next_cursor])
+        max_pages = Integer(ENV.fetch("BACKFILL_PAGES_PER_RUN", "0"))
+        jobs = []
+        pages = 0
+        last_error = nil
+
+        while query_index < queries.length
+          query = queries[query_index]
+          country = countries[country_index]
+          result = fetch_query(q: query, country: country, offset: offset, max_pages: 1)
+          jobs.concat(result[:jobs])
+          pages += 1
+          last_error = result[:last_error]
+
+          if result[:exhausted]
+            offset = 0
+            country_index += 1
+            if country_index >= countries.length
+              country_index = 0
+              query_index += 1
+            end
+          else
+            offset = result[:next_cursor].to_i
+          end
+
+          break if max_pages.positive? && pages >= max_pages
+        end
+
+        exhausted = query_index >= queries.length
+        next_cursor = exhausted ? nil : [query_index, country_index, offset].join(",")
+        { jobs: jobs.uniq { |job| job[:source_key] }, next_cursor: next_cursor, exhausted: exhausted, last_error: last_error }
+      end
+
+      def fetch_query(q:, country: nil, offset: 0, max_pages: 1)
+        limit = 20
+        jobs = []
+        total_count = nil
+        pages_fetched = 0
+        last_error = nil
+
+        loop do
+          break if max_pages.positive? && pages_fetched >= max_pages
+
+          begin
+            params = { "q" => q, "limit" => limit, "offset" => offset }
+            params["country"] = country if country && country != "remote"
+            params["remote"] = "true" if country == "remote"
+            payload = client.get_json("https://himalayas.app/jobs/api/search?#{URI.encode_www_form(params)}")
+            total_count ||= payload["totalCount"].to_i if payload["totalCount"]
+            page_jobs = payload.fetch("jobs", [])
+            return { jobs: normalize(page_jobs), next_cursor: offset, exhausted: true, last_error: nil } if page_jobs.empty?
+
+            jobs.concat(page_jobs)
+            pages_fetched += 1
+            offset += limit
+            return { jobs: normalize(jobs), next_cursor: offset, exhausted: true, last_error: nil } if total_count && offset >= total_count
+          rescue RuntimeError
+            raise if jobs.empty? && offset.zero?
+
+            last_error = "blocked_or_limited_at_offset=#{offset}"
+            return { jobs: normalize(jobs), next_cursor: offset, exhausted: true, last_error: last_error }
+          end
+        end
+
+        { jobs: normalize(jobs), next_cursor: offset, exhausted: false, last_error: last_error }
+      end
+
+      private
+
+      def queries
+        ENV.fetch("HIMALAYAS_SEARCH_QUERIES", QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def countries
+        ENV.fetch("HIMALAYAS_SEARCH_COUNTRIES", COUNTRIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def parse_cursor(cursor)
+        parts = cursor.to_s.split(/[|,]/).map(&:to_i)
+        [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+      end
+
+      def normalize(jobs)
+        jobs.map do |job|
+          salary = [job["currency"], job["minSalary"], job["maxSalary"]].compact.join(" ")
+          locations = Array(job["locationRestrictions"]).map { |location| location.is_a?(Hash) ? location["name"] : location.to_s }
+          {
+            source_key: job.fetch("guid").to_s,
+            title: job.fetch("title"),
+            company: job["companyName"],
+            location: locations.empty? ? "Worldwide" : locations.join(", "),
+            remote: job.to_s.match?(/remote/i) || locations.any? { |location| location.match?(/remote/i) } ? true : nil,
+            employment_type: job["employmentType"],
+            category: Array(job["categories"]).join(", "),
+            salary: salary.empty? ? nil : salary,
+            source_url: job.fetch("applicationLink"),
+            published_at: parse_time(job["pubDate"]),
+            tags: Array(job["parentCategories"]) + Array(job["seniority"]),
+            description: text(job["description"] || job["excerpt"]),
+            raw: job
+          }
+        end
+      end
+    end
+
+    class GetOnBoard < Base
+      QUERIES = [
+        "software engineer",
+        "developer",
+        "backend",
+        "frontend",
+        "full stack",
+        "ruby",
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "node",
+        "java",
+        "golang",
+        "data",
+        "devops",
+        "product manager",
+        "designer",
+        "qa"
+      ].freeze
+
+      def name = "getonbrd"
+
+      def fetch
+        queries.flat_map do |query|
+          fetch_query(query: query, page: 1, max_pages: Integer(ENV.fetch("GETONBRD_PAGES_PER_QUERY", "1")))
+        end.uniq { |job| job[:source_key] }
+      end
+
+      def fetch_query(query:, page: 1, max_pages: 1)
+        jobs = []
+        pages_fetched = 0
+
+        loop do
+          break if max_pages.positive? && pages_fetched >= max_pages
+
+          payload = client.get_json("https://www.getonbrd.com/api/v0/search/jobs?#{URI.encode_www_form("query" => query, "page" => page)}")
+          page_jobs = Array(payload["data"])
+          break if page_jobs.empty?
+
+          jobs.concat(page_jobs)
+          pages_fetched += 1
+          total_pages = payload.dig("meta", "total_pages").to_i
+          break if total_pages.positive? && page >= total_pages
+
+          page += 1
+        end
+
+        normalize(jobs)
+      rescue StandardError => e
+        warn "getonbrd query failed query=#{query.inspect} page=#{page}: #{e.class}: #{e.message}"
+        []
+      end
+
+      private
+
+      def queries
+        ENV.fetch("GETONBRD_QUERIES", QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def normalize(jobs)
+        jobs.map do |job|
+          attributes = job["attributes"] || {}
+          salary = salary_text(attributes["min_salary"], attributes["max_salary"])
+          url = job.dig("links", "public_url") || "https://www.getonbrd.com/jobs/#{job.fetch("id")}"
+
+          {
+            source_key: job.fetch("id").to_s,
+            title: attributes.fetch("title"),
+            company: company_name(job, attributes),
+            location: location_text(attributes),
+            remote: attributes["remote"],
+            employment_type: nil,
+            category: attributes["category_name"],
+            salary: salary,
+            source_url: url,
+            published_at: parse_time(attributes["published_at"]),
+            tags: tags(attributes),
+            description: description_html(attributes),
+            raw: job
+          }
+        end
+      end
+
+      def company_name(job, attributes)
+        value = attributes["company_name"] || attributes.dig("company", "name")
+        return value unless value.to_s.empty?
+
+        slug_company(job["id"], attributes["title"])
+      end
+
+      def slug_company(id, title)
+        tokens = id.to_s.split("-")
+        tokens.pop if tokens.last.to_s.match?(/\A[a-z0-9]{4,8}\z/)
+        title_tokens = title.to_s.downcase.gsub(/[^[:alnum:]\s]/, " ").split
+        title_tokens.each do |token|
+          break unless tokens.first == token
+
+          tokens.shift
+        end
+        tokens.pop while tokens.last.to_s.match?(/\A(remote|remoto|hybrid|hibrido|onsite|presencial|latam|chile|mexico|colombia|peru|argentina|brazil|brasil)\z/i)
+        name = tokens.join(" ")
+        name.empty? ? nil : name.split.map(&:capitalize).join(" ")
+      end
+
+      def location_text(attributes)
+        countries = Array(attributes["countries"]).map(&:to_s).reject(&:empty?)
+        return countries.join(", ") unless countries.empty?
+        return "Remote" if attributes["remote"]
+
+        attributes["remote_modality"].to_s.empty? ? nil : attributes["remote_modality"]
+      end
+
+      def salary_text(min, max)
+        values = [min, max].compact
+        return nil if values.empty?
+
+        "USD #{values.uniq.join(" - ")} / month"
+      end
+
+      def tags(attributes)
+        [
+          attributes["category_name"],
+          attributes["remote_modality"],
+          attributes["lang"],
+          Array(attributes["perks"])
+        ].flatten.compact.reject(&:empty?).uniq
+      end
+
+      def description_html(attributes)
+        sections = [
+          [attributes["description_headline"], attributes["description"]],
+          ["Projects", attributes["projects"]],
+          [attributes["functions_headline"], attributes["functions"]],
+          [attributes["benefits_headline"], attributes["benefits"]],
+          [attributes["desirable_headline"], attributes["desirable"]]
+        ]
+
+        sections.filter_map do |heading, body|
+          body = body.to_s.strip
+          next if body.empty?
+
+          heading = heading.to_s.strip
+          heading.empty? ? body : "<h3>#{escape_html(heading)}</h3>#{body}"
+        end.join("\n")
+      end
+
+      def escape_html(value)
+        value.to_s
+          .gsub("&", "&amp;")
+          .gsub("<", "&lt;")
+          .gsub(">", "&gt;")
+          .gsub('"', "&quot;")
+          .gsub("'", "&#39;")
+      end
+    end
+
     class RemoteOk < Base
       def name = "remoteok"
 
@@ -1424,31 +1729,19 @@ module Standalone
         text = text.gsub(/\s+/, " ").strip
         return nil if text.empty?
 
-        text = text.gsub(/([a-z0-9])\.([A-Z])/, "\\1. \\2")
+        text = text
+          .gsub(/([a-z0-9])\.([A-Z])/, "\\1. \\2")
+          .gsub(/([a-z0-9\)])([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,5})(?=:|[A-Z][a-z]|\z)/) do
+            previous = Regexp.last_match(1)
+            heading = Regexp.last_match(2)
+            WEB3_HEADINGS.include?(heading) ? "#{previous}\n#{heading}" : Regexp.last_match(0)
+          end
 
-        headings = [
-          "About Us",
-          "About the Team",
-          "Responsibilities",
-          "Requirements",
-          "Qualifications",
-          "Benefits",
-          "About The Role",
-          "About the Role",
-          "What You'll Do",
-          "What You’ll Do",
-          "Who You Are",
-          "Your skills",
-          "Technologies we use",
-          "About Working With Us",
-          "How You'll Grow",
-          "How You’ll Grow"
-        ].sort_by { |heading| -heading.length }
-        heading_pattern = headings.map { |heading| Regexp.escape(heading) }.join("|")
-        chunks = text.split(/(?=\b(?:#{heading_pattern})(?=[:\s-]|[A-Z]|\z))/i).map(&:strip).reject(&:empty?)
+        heading_pattern = WEB3_HEADINGS.map { |heading| Regexp.escape(heading) }.join("|")
+        chunks = text.split(/(?=\b(?:#{heading_pattern})(?=[:?\s-]|[A-Z]|\z))/i).map(&:strip).reject(&:empty?)
 
         chunks.map do |chunk|
-          if (match = chunk.match(/\A(#{heading_pattern})[:\s-]*(.*)\z/i))
+          if (match = chunk.match(/\A(#{heading_pattern})[:?\s-]*(.*)\z/i))
             heading = CGI.escapeHTML(match[1])
             body = format_section_body(match[1], match[2].to_s.strip)
             body.empty? ? "<h4>#{heading}</h4>" : "<h4>#{heading}</h4>#{body}"
@@ -1459,6 +1752,36 @@ module Standalone
       end
 
       private
+
+      WEB3_HEADINGS = [
+        "About Us",
+        "About the Team",
+        "Responsibilities",
+        "Requirements",
+        "Qualifications",
+        "Benefits",
+        "Join Tether and Shape the Future of Digital Finance",
+        "At Tether",
+        "Innovate with Tether",
+        "Tether Finance",
+        "Tether Power",
+        "Tether Data",
+        "Tether Education",
+        "Tether Evolution",
+        "About The Job",
+        "About the job",
+        "About The Role",
+        "About the Role",
+        "Why Join Us",
+        "What You'll Do",
+        "What You’ll Do",
+        "Who You Are",
+        "Your skills",
+        "Technologies we use",
+        "About Working With Us",
+        "How You'll Grow",
+        "How You’ll Grow"
+      ].sort_by { |heading| -heading.length }.freeze
 
       WEB3_BULLET_LABELS = [
         "Developer Tooling",
@@ -1478,30 +1801,62 @@ module Standalone
         "You will",
         "Responsibilities",
         "Requirements",
-        "Benefits"
+        "Benefits",
+        "Work on",
+        "Collaborate closely",
+        "Integrate",
+        "Manage",
+        "Excellent programming skills",
+        "Strong experience",
+        "Good understanding",
+        "Experience with",
+        "Demonstrated ability",
+        "Has experience",
+        "Managing",
+        "Regularly assessing",
+        "Leveraging",
+        "Ensuring"
       ].sort_by { |label| -label.length }.freeze
 
       WEB3_BULLET_SECTIONS = [
         "What You'll Do",
         "What You’ll Do",
         "Your skills",
-        "Skills"
+        "Skills",
+        "Responsibilities",
+        "Requirements",
+        "Qualifications"
       ].map(&:downcase).freeze
 
       def format_section_body(heading, body)
         return "" if body.empty?
 
+        bullet_section = WEB3_BULLET_SECTIONS.include?(heading.downcase)
+        body = insert_sentence_breaks(body) if bullet_section
         items = colon_bullet_items(heading, body)
-        return "<p>#{CGI.escapeHTML(body)}</p>" if items.empty?
+        items = sentence_bullet_items(heading, body) if items.empty?
+        return paragraph_html(body) if items.empty?
 
         preamble = body[0...items.first.fetch(:begin)].to_s.strip
         preamble_html = preamble.empty? ? "" : "<p>#{CGI.escapeHTML(preamble)}</p>"
         list = items.map do |item|
           label = CGI.escapeHTML(item.fetch(:label))
           text = CGI.escapeHTML(item.fetch(:text))
-          "<li><strong>#{label}:</strong> #{text}</li>"
+          label.empty? ? "<li>#{text}</li>" : "<li><strong>#{label}:</strong> #{text}</li>"
         end.join
         "#{preamble_html}<ul>#{list}</ul>"
+      end
+
+      def insert_sentence_breaks(body)
+        WEB3_BULLET_LABELS.reduce(body.to_s) do |text, label|
+          text.gsub(/([a-z0-9\)])\s+(#{Regexp.escape(label)}\b)/, "\\1\n\\2")
+        end
+      end
+
+      def paragraph_html(body)
+        body.to_s.split(/\n{1,}/).map(&:strip).reject(&:empty?).map do |paragraph|
+          "<p>#{CGI.escapeHTML(paragraph)}</p>"
+        end.join
       end
 
       def colon_bullet_items(heading, body)
@@ -1521,6 +1876,37 @@ module Standalone
           next if text.empty?
 
           { label: match[:label], text: text, begin: match[:begin] }
+        end
+      end
+
+      def sentence_bullet_items(heading, body)
+        return [] unless WEB3_BULLET_SECTIONS.include?(heading.downcase)
+
+        lines = body.to_s.split(/\n+/).map(&:strip).reject(&:empty?)
+        return [] if lines.length < 2
+
+        preamble = []
+        bullets = []
+
+        lines.each do |line|
+          if line.match?(/\A(?:#{WEB3_BULLET_LABELS.map { |label| Regexp.escape(label) }.join("|")})\b/i)
+            bullets << line
+          elsif bullets.empty?
+            preamble << line
+          else
+            bullets << line
+          end
+        end
+
+        return [] if bullets.empty?
+
+        offset = preamble.join("\n").length
+        bullets.map.with_index do |line, index|
+          if (match = line.match(/\A(#{WEB3_BULLET_LABELS.map { |label| Regexp.escape(label) }.join("|")})[:\s-]*(.*)\z/i))
+            { label: match[1], text: match[2].to_s.strip, begin: index.zero? ? offset : offset + 1 }
+          else
+            { label: "", text: line, begin: index.zero? ? offset : offset + 1 }
+          end
         end
       end
 
@@ -2241,7 +2627,9 @@ module Standalone
       Sources::RemoteOk,
       Sources::RemoteJobs,
       Sources::Himalayas,
+      Sources::HimalayasSearch,
       Sources::Jobicy,
+      Sources::GetOnBoard,
       Sources::Web3Career,
       Sources::Greenhouse,
       Sources::Lever,

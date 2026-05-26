@@ -36,3 +36,17 @@ JobSource.find_or_create_by!(adapter: "himalayas") do |source|
   source.crawl_interval_minutes = 1440
   source.terms_note = "Free public API. Displayed data requires visible link back to Himalayas and source attribution."
 end
+
+JobSource.find_or_create_by!(adapter: "himalayas_search") do |source|
+  source.name = "Himalayas Search"
+  source.base_url = "https://himalayas.app/jobs/api/search"
+  source.crawl_interval_minutes = 1440
+  source.terms_note = "Free public API. Query fanout across role and country filters for broader remote job coverage."
+end
+
+JobSource.find_or_create_by!(adapter: "getonbrd") do |source|
+  source.name = "Get on Board"
+  source.base_url = "https://www.getonbrd.com/api/v0/search/jobs"
+  source.crawl_interval_minutes = 360
+  source.terms_note = "Public API exposes published marketplace jobs without authentication; LATAM tech coverage."
+end

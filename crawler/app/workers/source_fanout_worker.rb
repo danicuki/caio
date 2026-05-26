@@ -41,10 +41,15 @@ class SourceFanoutWorker
     typeform workable
   ].freeze
 
+  HIMALAYAS_SEARCH_QUERIES = Standalone::Sources::HimalayasSearch::QUERIES.freeze
+  HIMALAYAS_SEARCH_COUNTRIES = Standalone::Sources::HimalayasSearch::COUNTRIES.freeze
+  GETONBRD_QUERIES = Standalone::Sources::GetOnBoard::QUERIES.freeze
+
   def perform
     enqueue_static_sources
     enqueue_jobicy
     enqueue_web3career
+    enqueue_public_marketplaces
     enqueue_company_boards
     enqueue_company_name_ats_probes
     enqueue_new_ats_sources
@@ -81,6 +86,22 @@ class SourceFanoutWorker
 
     Integer(ENV.fetch("WEB3CAREER_SOURCE_PAGES", "5000")).times do |index|
       StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "html", "page" => index + 1 })
+    end
+  end
+
+  def enqueue_public_marketplaces
+    himalayas_search_queries.each do |query|
+      himalayas_search_countries.each do |country|
+        Integer(ENV.fetch("HIMALAYAS_SEARCH_SOURCE_PAGES", "10")).times do |index|
+          StandaloneSourceFetchWorker.perform_async("himalayas_search", { "query" => query, "country" => country, "offset" => index * 20 })
+        end
+      end
+    end
+
+    getonbrd_queries.each do |query|
+      Integer(ENV.fetch("GETONBRD_SOURCE_PAGES", "2")).times do |index|
+        StandaloneSourceFetchWorker.perform_async("getonbrd", { "query" => query, "page" => index + 1 })
+      end
     end
   end
 
@@ -233,6 +254,18 @@ class SourceFanoutWorker
 
   def workable_accounts
     WORKABLE_ACCOUNTS + discovered(%r{apply\.workable\.com/([^/?#]+)}i)
+  end
+
+  def himalayas_search_queries
+    ENV.fetch("HIMALAYAS_SEARCH_QUERIES", HIMALAYAS_SEARCH_QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def himalayas_search_countries
+    ENV.fetch("HIMALAYAS_SEARCH_COUNTRIES", HIMALAYAS_SEARCH_COUNTRIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def getonbrd_queries
+    ENV.fetch("GETONBRD_QUERIES", GETONBRD_QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
   end
 
   def discovered(pattern)
