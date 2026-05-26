@@ -964,6 +964,10 @@ module Standalone
       def text(value)
         value.to_s.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
       end
+
+      def html_description(value)
+        value.to_s.strip
+      end
     end
 
     class Remotive < Base
@@ -984,7 +988,7 @@ module Standalone
             source_url: job.fetch("url"),
             published_at: parse_time(job["publication_date"]),
             tags: job["tags"] || [],
-            description: text(job["description"]),
+            description: html_description(job["description"]),
             raw: job
           }
         end
@@ -1290,7 +1294,7 @@ module Standalone
             source_url: job["url"] || job["apply_url"],
             published_at: parse_time(job["posted_at"]),
             tags: [job.dig("category", "slug"), job["original_language"]].compact,
-            description: text(job["description"]),
+            description: html_description(job["description"]),
             raw: job
           }
         end
@@ -1360,7 +1364,7 @@ module Standalone
             source_url: job.fetch("applicationLink"),
             published_at: parse_time(job["pubDate"]),
             tags: Array(job["parentCategories"]) + Array(job["seniority"]),
-            description: text(job["description"]),
+            description: html_description(job["description"]),
             raw: job
           }
         end
@@ -1488,7 +1492,7 @@ module Standalone
             source_url: job.fetch("applicationLink"),
             published_at: parse_time(job["pubDate"]),
             tags: Array(job["parentCategories"]) + Array(job["seniority"]),
-            description: text(job["description"] || job["excerpt"]),
+            description: html_description(job["description"] || job["excerpt"]),
             raw: job
           }
         end
