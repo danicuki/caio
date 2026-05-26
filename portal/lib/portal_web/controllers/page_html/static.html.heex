@@ -1,0 +1,28 @@
+<main class="site-shell static-shell">
+  <PortalWeb.JobHTML.site_nav active="" compact={true} />
+
+  <section class="static-hero">
+    <p class="eyebrow">{@eyebrow}</p>
+    <h1>{@title}</h1>
+    <p class="static-intro">{@intro}</p>
+
+    <%= if assigns[:updated] do %>
+      <p class="static-updated">Last updated {@updated}</p>
+    <% end %>
+
+    <%= if assigns[:cta] do %>
+      <a href={@cta.path} class="primary-button">{@cta.label}</a>
+    <% end %>
+  </section>
+
+  <section class="static-content">
+    <%= for section <- @sections do %>
+      <article class="static-section">
+        <h2>{section.title}</h2>
+        <p>{section.body}</p>
+      </article>
+    <% end %>
+  </section>
+
+  <PortalWeb.JobHTML.footer />
+</main>

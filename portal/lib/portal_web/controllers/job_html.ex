@@ -202,18 +202,18 @@ defmodule PortalWeb.JobHTML do
 
         <nav class="footer-column" aria-label="Caio">
           <h2>Caio</h2>
-          <a href={~p"/"}>About</a>
-          <a href="#unlock">How it works</a>
-          <a href={~p"/jobs?order=random"}>Changelog</a>
-          <a href="#unlock">Pricing</a>
+          <a href={~p"/about"}>About</a>
+          <a href={~p"/how-it-works"}>How it works</a>
+          <a href={~p"/changelog"}>Changelog</a>
+          <a href={~p"/pricing"}>Pricing</a>
         </nav>
 
         <nav class="footer-column" aria-label="Help">
           <h2>Help</h2>
-          <a href="mailto:hello@caio.jobs">Contact</a>
-          <a href="#privacy">Privacy</a>
-          <a href="#terms">Terms</a>
-          <a href="#status">Status</a>
+          <a href="mailto:contact@caio-jobs.com">Contact</a>
+          <a href={~p"/privacy"}>Privacy</a>
+          <a href={~p"/terms"}>Terms</a>
+          <a href={~p"/status"}>Status</a>
         </nav>
 
         <div class="footer-bottom">

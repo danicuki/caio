@@ -18,6 +18,13 @@ defmodule PortalWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/about", PageController, :about
+    get "/how-it-works", PageController, :how_it_works
+    get "/pricing", PageController, :pricing
+    get "/privacy", PageController, :privacy
+    get "/terms", PageController, :terms
+    get "/status", PageController, :status
+    get "/changelog", PageController, :changelog
     get "/jobs", JobController, :index
     get "/jobs/:id", JobController, :show
     post "/jobs/:id/apply", JobController, :apply
