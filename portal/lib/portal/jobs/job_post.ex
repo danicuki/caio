@@ -7,6 +7,7 @@ defmodule Portal.Jobs.JobPost do
     field :title, :string
     field :company, :string
     field :company_id, :string
+    field :company_logo_url, :string, virtual: true
     field :location, :string
     field :remote, :integer
     field :employment_type, :string

@@ -85,6 +85,12 @@ defmodule Portal.Jobs do
     JobPost
     |> public_scope()
     |> where([j], j.id == ^id)
+    |> with_company_cache()
+    |> select([j, a, c], j)
+    |> select_merge([j, a, c], %{
+      company_id: coalesce(j.company_id, a.company_id),
+      company_logo_url: c.logo_url
+    })
     |> Repo.one!()
   end
 
@@ -193,6 +199,70 @@ defmodule Portal.Jobs do
     refresh_company_stats(now)
   end
 
+  def refresh_company_logos(opts \\ []) do
+    force? = Keyword.get(opts, :force, false)
+    limit = Keyword.get(opts, :limit)
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    domain_by_company_id =
+      Repo.query!("""
+      SELECT COALESCE(j.company_id, a.company_id) AS company_id, j.source_url
+      FROM job_posts j
+      LEFT JOIN company_aliases a
+        ON a.normalized_name = lower(trim(j.company))
+      WHERE COALESCE(j.company_id, a.company_id) IS NOT NULL
+        AND COALESCE(j.company_id, a.company_id) != ''
+        AND j.source_url IS NOT NULL
+        AND j.source_url != ''
+      """)
+      |> Map.fetch!(:rows)
+      |> Enum.reduce(%{}, fn [company_id, source_url], acc ->
+        case logo_domain_from_url(source_url) do
+          nil ->
+            acc
+
+          domain ->
+            Map.update(acc, company_id, %{domain => 1}, fn domain_counts ->
+              Map.update(domain_counts, domain, 1, &(&1 + 1))
+            end)
+        end
+      end)
+      |> Map.new(fn {company_id, domain_counts} ->
+        {domain, _count} = Enum.max_by(domain_counts, fn {_domain, count} -> count end)
+        {company_id, domain}
+      end)
+
+    companies_with_domains =
+      Company
+      |> where([c], c.open_jobs_count > 0)
+      |> maybe_missing_logo_filter(force?)
+      |> select([c], {c.id, c.name})
+      |> Repo.all()
+      |> Enum.map(fn {company_id, name} ->
+        {company_id, Map.get(domain_by_company_id, company_id) || guessed_logo_domain(name)}
+      end)
+      |> Enum.reject(fn {_company_id, domain} -> is_nil(domain) end)
+      |> maybe_limit(limit)
+
+    Enum.reduce(companies_with_domains, %{companies: 0}, fn {company_id, domain}, acc ->
+      query =
+        Company
+        |> where([c], c.id == ^company_id)
+        |> maybe_missing_logo_filter(force?)
+
+      {count, _} =
+        Repo.update_all(query,
+          set: [
+            website_url: "https://#{domain}",
+            logo_url: logo_url_for_domain(domain),
+            updated_at: now
+          ]
+        )
+
+      %{acc | companies: acc.companies + count}
+    end)
+  end
+
   def company_slug(company) do
     company
     |> to_string()
@@ -213,6 +283,21 @@ defmodule Portal.Jobs do
   def company_path(%JobPost{company: company}), do: company_path(company)
 
   def company_path(company), do: "/companies/#{company_slug(company)}"
+
+  def logo_url_for_domain(domain) do
+    "https://www.google.com/s2/favicons?domain=#{URI.encode_www_form(domain)}&sz=128"
+  end
+
+  def logo_url_for_company(company_name) when company_name not in [nil, ""] do
+    company_name
+    |> guessed_logo_domain()
+    |> case do
+      nil -> nil
+      domain -> logo_url_for_domain(domain)
+    end
+  end
+
+  def logo_url_for_company(_company_name), do: nil
 
   defp normalize_slug(slug) do
     slug
@@ -523,6 +608,78 @@ defmodule Portal.Jobs do
     _ -> []
   end
 
+  defp logo_domain_from_url(source_url) do
+    with %URI{host: host} when is_binary(host) <- URI.parse(source_url),
+         domain when not is_nil(domain) <- registrable_domain(host),
+         false <- ignored_logo_domain?(domain) do
+      domain
+    else
+      _ -> nil
+    end
+  end
+
+  defp guessed_logo_domain(company_name) do
+    company_name
+    |> to_string()
+    |> String.downcase()
+    |> String.replace("&", "and")
+    |> String.replace(
+      ~r/\b(inc|incorporated|llc|ltd|limited|gmbh|ag|sa|plc|corp|corporation|co|company)\b\.?/u,
+      " "
+    )
+    |> String.replace(~r/[^a-z0-9]+/u, "")
+    |> case do
+      "" -> nil
+      domain -> "#{domain}.com"
+    end
+  end
+
+  defp registrable_domain(host) do
+    host =
+      host
+      |> String.downcase()
+      |> String.trim_leading("www.")
+
+    parts = String.split(host, ".", trim: true)
+
+    cond do
+      length(parts) < 2 ->
+        nil
+
+      length(parts) >= 3 and Enum.join(Enum.take(parts, -2), ".") in common_second_level_tlds() ->
+        parts |> Enum.take(-3) |> Enum.join(".")
+
+      true ->
+        parts |> Enum.take(-2) |> Enum.join(".")
+    end
+  end
+
+  defp common_second_level_tlds do
+    ~w(
+      co.uk com.au com.br com.mx com.sg com.tr co.jp co.kr co.nz co.za
+      com.ar com.co com.pl com.pt com.ng
+    )
+  end
+
+  defp ignored_logo_domain?(domain) do
+    domain in ~w(
+      angel.co applicantai.com applytojob.com arbeitnow.com ashbyhq.com bamboohr.com breezy.hr
+      builtin.com careerplug.com comeet.co greenhouse.io greenhouse.io
+      getonbrd.com himalayas.app indeed.com jobicy.com jobs.lever.co lever.co linkedin.com
+      remoteok.com remotive.com recruitee.com smartrecruiters.com themuse.com
+      remotejobs.org workable.com workdayjobs.com web3.career ziprecruiter.com
+    )
+  end
+
+  defp maybe_limit(items, nil), do: items
+  defp maybe_limit(items, limit), do: Enum.take(items, limit)
+
+  defp maybe_missing_logo_filter(query, true), do: query
+
+  defp maybe_missing_logo_filter(query, false) do
+    where(query, [c], is_nil(c.logo_url) or c.logo_url == "")
+  end
+
   defp company_slug_query(slug) do
     JobPost
     |> public_scope()
@@ -608,7 +765,21 @@ defmodule Portal.Jobs do
   end
 
   defp select_list_fields(query) do
-    select(query, [j], struct(j, ^@list_fields))
+    query
+    |> with_company_cache()
+    |> select([j, a, c], struct(j, ^@list_fields))
+    |> select_merge([j, a, c], %{
+      company_id: coalesce(j.company_id, a.company_id),
+      company_logo_url: c.logo_url
+    })
+  end
+
+  defp with_company_cache(query) do
+    query
+    |> join(:left, [j], a in "company_aliases",
+      on: a.normalized_name == fragment("lower(trim(?))", j.company)
+    )
+    |> join(:left, [j, a], c in Company, on: c.id == coalesce(j.company_id, a.company_id))
   end
 
   defp limited_count(query, cap \\ 10_000) do

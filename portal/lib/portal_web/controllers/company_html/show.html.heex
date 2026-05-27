@@ -8,9 +8,9 @@
     <div class="company-hero-grid">
       <div>
         <div class="detail-company-line">
-          <span class="company-avatar" aria-hidden="true">
-            {PortalWeb.JobHTML.company_initials(%{company: @profile.name})}
-          </span>
+          <PortalWeb.JobHTML.company_avatar job={
+            %{company: @profile.name, company_logo_url: @profile.logo_url}
+          } />
           <span>
             <strong>{@profile.name}</strong>
             <small>Live company profile from Caio's index</small>

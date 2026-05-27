@@ -113,7 +113,13 @@ defmodule PortalWeb.JobHTML do
 
   def company_avatar(assigns) do
     ~H"""
-    <span class="company-avatar" aria-hidden="true">{company_initials(@job)}</span>
+    <span class={["company-avatar", company_logo_url(@job) && "has-logo"]} aria-hidden="true">
+      <%= if logo_url = company_logo_url(@job) do %>
+        <img src={logo_url} alt="" loading="lazy" referrerpolicy="no-referrer" />
+      <% else %>
+        {company_initials(@job)}
+      <% end %>
+    </span>
     """
   end
 
@@ -474,6 +480,10 @@ defmodule PortalWeb.JobHTML do
       "" -> "C"
       value -> value
     end
+  end
+
+  def company_logo_url(job) do
+    Map.get(job, :company_logo_url) || Portal.Jobs.logo_url_for_company(Map.get(job, :company))
   end
 
   defp parsed_tags(%{tags_json: value}) when value not in [nil, ""] do

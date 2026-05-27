@@ -781,6 +781,19 @@ button {
   background: var(--green-tint);
   font-size: 13px;
   font-weight: 800;
+  overflow: hidden;
+}
+
+.company-avatar.has-logo {
+  border-color: var(--line);
+  background: #fff;
+}
+
+.company-avatar img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .logo-strip {

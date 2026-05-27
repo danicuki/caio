@@ -28,15 +28,19 @@ defmodule PortalWeb.PageController do
   end
 
   def sitemap(conn, _params) do
+    body =
+      [
+        ~s(<?xml version="1.0" encoding="UTF-8"?>),
+        ~s(<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">),
+        "  <sitemap><loc>https://caio-jobs.com/sitemap-static.xml</loc></sitemap>",
+        "  <sitemap><loc>https://caio-jobs.com/sitemap-companies.xml</loc></sitemap>",
+        "</sitemapindex>"
+      ]
+      |> Enum.join("\n")
+
     conn
     |> put_resp_content_type("application/xml")
-    |> text("""
-    <?xml version="1.0" encoding="UTF-8"?>
-    <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      <sitemap><loc>https://caio-jobs.com/sitemap-static.xml</loc></sitemap>
-      <sitemap><loc>https://caio-jobs.com/sitemap-companies.xml</loc></sitemap>
-    </sitemapindex>
-    """)
+    |> text(body)
   end
 
   def sitemap_static(conn, _params) do
