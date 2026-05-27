@@ -2,6 +2,7 @@ defmodule Portal.Accounts do
   import Ecto.Query
 
   alias Portal.Accounts.{JobInterest, Lead}
+  alias Portal.Jobs.JobPost
   alias Portal.Repo
 
   def get_lead(nil), do: nil
@@ -36,5 +37,19 @@ defmodule Portal.Accounts do
     |> where([i], i.lead_id == ^lead_id)
     |> select([i], count(i.id))
     |> Repo.one()
+  end
+
+  def recent_interests(lead_id, limit \\ 50)
+
+  def recent_interests(nil, _limit), do: []
+
+  def recent_interests(lead_id, limit) do
+    JobInterest
+    |> join(:left, [i], j in JobPost, on: j.id == i.job_post_id)
+    |> where([i], i.lead_id == ^lead_id)
+    |> order_by([i], desc: i.created_at, desc: i.id)
+    |> limit(^limit)
+    |> select([i, j], %{interest: i, job: j})
+    |> Repo.all()
   end
 end

@@ -27,6 +27,7 @@ defmodule PortalWeb.Router do
     get "/changelog", PageController, :changelog
     get "/auth/github", AuthController, :github
     get "/auth/github/callback", AuthController, :github_callback
+    get "/my-jobs", MyJobsController, :index
     get "/jobs", JobController, :index
     get "/jobs/:id", JobController, :show
     post "/jobs/:id/apply", JobController, :apply

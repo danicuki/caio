@@ -46,7 +46,7 @@ defmodule PortalWeb.JobHTML do
           <a href={~p"/jobs"} class={["nav-link", @active == "jobs" && "active"]}>Jobs</a>
           <a href={~p"/jobs?order=random"} class="nav-link">Explore</a>
           <%= if @lead do %>
-            <span class="nav-pill">Profile active</span>
+            <a href={~p"/my-jobs"} class={["nav-link", @active == "my-jobs" && "active"]}>My jobs</a>
             <form action={~p"/logout"} method="post" class="nav-logout-form">
               <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
               <button type="submit" class="nav-link nav-logout">Log out</button>

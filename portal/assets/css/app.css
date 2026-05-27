@@ -1624,6 +1624,98 @@ button {
   padding-top: 24px;
 }
 
+.my-jobs-shell {
+  padding-bottom: 56px;
+}
+
+.my-jobs-hero {
+  max-width: 820px;
+  padding: 34px 0 26px;
+}
+
+.my-jobs-hero h1 {
+  margin: 8px 0 12px;
+  font-size: clamp(42px, 7vw, 78px);
+  line-height: 0.98;
+}
+
+.my-jobs-hero p {
+  max-width: 680px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.my-jobs-list {
+  display: grid;
+  gap: 12px;
+  max-width: 880px;
+}
+
+.my-job-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--paper-2);
+}
+
+.my-job-date {
+  display: block;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.my-job-row h2 {
+  margin: 4px 0 5px;
+  font-size: 21px;
+}
+
+.my-job-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.my-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.my-job-actions a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.my-job-actions a:hover {
+  color: var(--paper);
+  background: var(--green);
+}
+
+.my-jobs-empty {
+  max-width: 620px;
+}
+
+.my-jobs-empty .primary-button {
+  margin-top: 14px;
+}
+
 .side-card {
   padding: 20px;
   border-radius: var(--r-lg);

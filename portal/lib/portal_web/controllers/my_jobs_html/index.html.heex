@@ -1,0 +1,50 @@
+<main class="site-shell my-jobs-shell">
+  <PortalWeb.JobHTML.site_nav active="my-jobs" compact lead={@lead} />
+
+  <section class="my-jobs-hero">
+    <span class="eyebrow">Your job trail</span>
+    <h1>Jobs you opened through Caio.</h1>
+    <p>
+      A lightweight memory of roles you chose to inspect or apply to, so interesting opportunities do not disappear after a redirect.
+    </p>
+  </section>
+
+  <%= if @interests == [] do %>
+    <section class="empty-state my-jobs-empty">
+      <h3>No saved signal yet</h3>
+      <p>Open a job through Caio and it will appear here automatically.</p>
+      <a href={~p"/jobs"} class="primary-button">Browse jobs</a>
+    </section>
+  <% else %>
+    <section class="my-jobs-list">
+      <%= for %{interest: interest, job: job} <- @interests do %>
+        <article class="my-job-row">
+          <%= if job do %>
+            <PortalWeb.JobHTML.company_avatar job={job} />
+            <div>
+              <span class="my-job-date">{format_interest_date(interest.created_at)}</span>
+              <h2>{job.title}</h2>
+              <p>{job.company || "Company"} · {PortalWeb.JobHTML.compact_location(job)}</p>
+              <div class="my-job-actions">
+                <a href={~p"/jobs/#{job.id}"}>View details</a>
+                <a href={interest.source_url}>Open source</a>
+              </div>
+            </div>
+          <% else %>
+            <span class="company-avatar" aria-hidden="true">?</span>
+            <div>
+              <span class="my-job-date">{format_interest_date(interest.created_at)}</span>
+              <h2>Original posting</h2>
+              <p>This job is no longer visible in the public index.</p>
+              <div class="my-job-actions">
+                <a href={interest.source_url}>Open source</a>
+              </div>
+            </div>
+          <% end %>
+        </article>
+      <% end %>
+    </section>
+  <% end %>
+
+  <PortalWeb.JobHTML.footer />
+</main>
