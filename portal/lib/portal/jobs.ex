@@ -85,6 +85,45 @@ defmodule Portal.Jobs do
     |> Repo.one!()
   end
 
+  def company_profile(company) when company not in [nil, ""] do
+    company_key = normalize_company(company)
+    base = company_query(company_key)
+
+    jobs =
+      base
+      |> order_by([j], desc: j.id)
+      |> limit(30)
+      |> select_list_fields()
+      |> Repo.all()
+
+    if jobs == [] do
+      nil
+    else
+      %{
+        name: jobs |> List.first() |> Map.get(:company),
+        slug: company_slug(company),
+        stats: company_profile_stats(base),
+        locations: company_top_values(base, :location_country, 8),
+        sources: company_top_values(base, :source, 8),
+        roles: jobs
+      }
+    end
+  end
+
+  def company_profile(_company), do: nil
+
+  def company_slug(company) do
+    company
+    |> to_string()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/u, "-")
+    |> String.trim("-")
+    |> case do
+      "" -> "company"
+      slug -> slug
+    end
+  end
+
   def company_stats(%JobPost{company: company}) when company not in [nil, ""] do
     company_key = normalize_company(company)
     cutoff = public_cutoff_date()
@@ -112,6 +151,41 @@ defmodule Portal.Jobs do
       location_count: 0,
       latest_posted_at: nil
     }
+  end
+
+  defp company_query(company_key) do
+    JobPost
+    |> public_scope()
+    |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
+    |> where([j], fragment("lower(trim(?))", j.company) == ^company_key)
+  end
+
+  defp company_profile_stats(query) do
+    query
+    |> select([j], %{
+      open_jobs_count: count(),
+      source_count: fragment("COUNT(DISTINCT NULLIF(lower(trim(?)), ''))", j.source),
+      location_count: fragment("COUNT(DISTINCT NULLIF(lower(trim(?)), ''))", j.location_country),
+      latest_posted_at: max(j.published_at),
+      salary_count: fragment("COUNT(NULLIF(?, ''))", j.salary),
+      remote_count:
+        fragment(
+          "SUM(CASE WHEN ? = 1 OR lower(coalesce(?, '')) LIKE '%remote%' THEN 1 ELSE 0 END)",
+          j.remote,
+          j.location_scope
+        )
+    })
+    |> Repo.one()
+  end
+
+  defp company_top_values(query, field, limit) when field in [:location_country, :source] do
+    query
+    |> where([j], not is_nil(field(j, ^field)) and fragment("trim(?)", field(j, ^field)) != "")
+    |> group_by([j], field(j, ^field))
+    |> order_by([j], desc: count(j.id), asc: field(j, ^field))
+    |> limit(^limit)
+    |> select([j], %{label: field(j, ^field), count: count(j.id)})
+    |> Repo.all()
   end
 
   defp public_scope(query) do

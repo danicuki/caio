@@ -1,0 +1,102 @@
+<main class="site-shell company-shell">
+  <PortalWeb.JobHTML.site_nav active="jobs" compact lead={@lead} />
+
+  <section class="company-hero">
+    <a href={~p"/jobs?company=#{@profile.name}"} class="back-link">
+      Search all {@profile.name} roles
+    </a>
+    <div class="company-hero-grid">
+      <div>
+        <div class="detail-company-line">
+          <span class="company-avatar" aria-hidden="true">
+            {PortalWeb.JobHTML.company_initials(%{company: @profile.name})}
+          </span>
+          <span>
+            <strong>{@profile.name}</strong>
+            <small>Live company profile from Caio's index</small>
+          </span>
+        </div>
+        <h1>{@profile.name} jobs on Caio</h1>
+        <p>
+          A compact view of open roles, locations, sources, and compensation signals for this company.
+        </p>
+      </div>
+      <div class="company-hero-card">
+        <span class="eyebrow">Open roles</span>
+        <strong>{@profile.stats.open_jobs_count}</strong>
+        <small>visible in the current public index</small>
+      </div>
+    </div>
+  </section>
+
+  <section class="company-metrics">
+    <article>
+      <strong>{@profile.stats.source_count}</strong>
+      <span>sources</span>
+    </article>
+    <article>
+      <strong>{@profile.stats.location_count}</strong>
+      <span>markets</span>
+    </article>
+    <article>
+      <strong>{@profile.stats.remote_count || 0}</strong>
+      <span>remote signals</span>
+    </article>
+    <article>
+      <strong>{@profile.stats.salary_count || 0}</strong>
+      <span>with salary</span>
+    </article>
+  </section>
+
+  <section class="company-layout">
+    <div class="company-main">
+      <div class="section-heading">
+        <span class="eyebrow">Latest indexed roles</span>
+        <h2>Open roles</h2>
+      </div>
+      <div class="result-stack">
+        <%= for job <- @profile.roles do %>
+          <PortalWeb.JobHTML.job_card job={job} />
+        <% end %>
+      </div>
+    </div>
+
+    <aside class="company-sidebar">
+      <section class="side-card">
+        <h2>Top locations</h2>
+        <div class="company-signal-list">
+          <%= for location <- @profile.locations do %>
+            <a href={~p"/jobs?company=#{@profile.name}&location=#{location.label}"}>
+              <span>{location.label}</span>
+              <strong>{location.count}</strong>
+            </a>
+          <% end %>
+        </div>
+      </section>
+
+      <section class="side-card">
+        <h2>Sources</h2>
+        <div class="company-signal-list">
+          <%= for source <- @profile.sources do %>
+            <span>
+              <span>{PortalWeb.JobHTML.source_label(source.label)}</span>
+              <strong>{source.count}</strong>
+            </span>
+          <% end %>
+        </div>
+      </section>
+
+      <section class="side-card salary-card">
+        <span class="eyebrow">Freshness</span>
+        <h2>
+          {PortalWeb.JobHTML.posted_label(%{published_at: @profile.stats.latest_posted_at})}
+        </h2>
+        <p>
+          Caio only shows public roles that pass the current freshness window.
+        </p>
+      </section>
+    </aside>
+  </section>
+
+  <PortalWeb.JobHTML.footer />
+</main>

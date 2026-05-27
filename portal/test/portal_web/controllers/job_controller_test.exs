@@ -86,18 +86,20 @@ defmodule PortalWeb.JobControllerTest do
   end
 
   defp job_fixture(attrs \\ %{}) do
-    Repo.insert!(%JobPost{
-      source: "test",
-      source_key: "test-#{System.unique_integer([:positive])}",
-      title: "Senior Elixir Engineer",
-      company: "Caio Labs",
-      location: "Remote",
-      source_url: "https://example.com/apply/#{System.unique_integer([:positive])}",
-      published_at: Date.utc_today() |> Date.to_iso8601(),
-      description: "Build useful job search software.",
-      created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    }
-    |> Map.merge(attrs))
+    Repo.insert!(
+      %JobPost{
+        source: "test",
+        source_key: "test-#{System.unique_integer([:positive])}",
+        title: "Senior Elixir Engineer",
+        company: "Caio Labs",
+        location: "Remote",
+        source_url: "https://example.com/apply/#{System.unique_integer([:positive])}",
+        published_at: Date.utc_today() |> Date.to_iso8601(),
+        description: "Build useful job search software.",
+        created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+      |> Map.merge(attrs)
+    )
   end
 end
