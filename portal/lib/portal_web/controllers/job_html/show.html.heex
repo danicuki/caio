@@ -82,12 +82,17 @@
         </p>
       </section>
 
-      <section class="side-card">
-        <h2>Similar role signals</h2>
-        <div class="similar-list">
-          <span>{employment_label(@job) || "Full-time"} roles</span>
-          <span>{remote_label(@job) || "Location flexible"} matches</span>
-          <span>{source_label(@job.source)} postings</span>
+      <section class="side-card fit-card">
+        <span class="eyebrow">Caio read</span>
+        <h2>Fit signals</h2>
+        <div class="fit-signal-list">
+          <%= for signal <- fit_signals(@job, @company_stats) do %>
+            <article class={["fit-signal", "fit-signal-#{signal.tone}"]}>
+              <span>{signal.label}</span>
+              <strong>{signal.value}</strong>
+              <p>{signal.detail}</p>
+            </article>
+          <% end %>
         </div>
       </section>
 

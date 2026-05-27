@@ -49,6 +49,24 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Intro Aufgaben Plan systems Coordinate teams"
   end
 
+  test "GET /jobs/:id renders Caio fit signals", %{conn: conn} do
+    job =
+      job_fixture(%{
+        remote: 1,
+        salary: "USD 120000-150000"
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ "Fit signals"
+    assert response =~ "Compensation"
+    assert response =~ "USD 120000-150000"
+    assert response =~ "Workplace"
+    assert response =~ "Remote"
+    assert response =~ "Source"
+  end
+
   test "POST /jobs/:id/apply creates a lead for guest applicants", %{conn: conn} do
     job = job_fixture()
 
@@ -86,18 +104,20 @@ defmodule PortalWeb.JobControllerTest do
   end
 
   defp job_fixture(attrs \\ %{}) do
-    Repo.insert!(%JobPost{
-      source: "test",
-      source_key: "test-#{System.unique_integer([:positive])}",
-      title: "Senior Elixir Engineer",
-      company: "Caio Labs",
-      location: "Remote",
-      source_url: "https://example.com/apply/#{System.unique_integer([:positive])}",
-      published_at: Date.utc_today() |> Date.to_iso8601(),
-      description: "Build useful job search software.",
-      created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    }
-    |> Map.merge(attrs))
+    Repo.insert!(
+      %JobPost{
+        source: "test",
+        source_key: "test-#{System.unique_integer([:positive])}",
+        title: "Senior Elixir Engineer",
+        company: "Caio Labs",
+        location: "Remote",
+        source_url: "https://example.com/apply/#{System.unique_integer([:positive])}",
+        published_at: Date.utc_today() |> Date.to_iso8601(),
+        description: "Build useful job search software.",
+        created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+      |> Map.merge(attrs)
+    )
   end
 end

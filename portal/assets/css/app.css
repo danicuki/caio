@@ -1659,9 +1659,49 @@ button {
   color: var(--green-2);
 }
 
+.fit-card h2 {
+  margin-bottom: 14px;
+}
+
+.fit-signal-list,
 .similar-list {
   display: grid;
   gap: 9px;
+}
+
+.fit-signal {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+}
+
+.fit-signal span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fit-signal strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.fit-signal p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.fit-signal-strong {
+  border-color: rgba(14, 92, 73, 0.18);
+  background: var(--green-tint);
 }
 
 .similar-list span,

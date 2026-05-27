@@ -434,6 +434,100 @@ defmodule PortalWeb.JobHTML do
     |> Enum.uniq()
   end
 
+  def fit_signals(job, company_stats \\ %{}) do
+    [
+      salary_signal(job),
+      remote_signal(job),
+      freshness_signal(job),
+      company_activity_signal(company_stats),
+      source_signal(job)
+    ]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp salary_signal(job) do
+    case salary(job) do
+      nil ->
+        %{
+          label: "Compensation",
+          value: "Not listed",
+          tone: "neutral",
+          detail: "Caio did not find a salary range in the original posting."
+        }
+
+      value ->
+        %{
+          label: "Compensation",
+          value: value,
+          tone: "strong",
+          detail: "Salary information is visible before you leave Caio."
+        }
+    end
+  end
+
+  defp remote_signal(job) do
+    case remote_label(job) do
+      nil ->
+        %{
+          label: "Workplace",
+          value: compact_location(job),
+          tone: "neutral",
+          detail: "Location is based on the indexed posting metadata."
+        }
+
+      value ->
+        %{
+          label: "Workplace",
+          value: value,
+          tone: "strong",
+          detail: "Remote or flexible work is explicitly signaled."
+        }
+    end
+  end
+
+  defp freshness_signal(%{published_at: value} = job) when value not in [nil, ""] do
+    case Date.from_iso8601(String.slice(value, 0, 10)) do
+      {:ok, date} ->
+        days = Date.diff(Date.utc_today(), date)
+
+        %{
+          label: "Freshness",
+          value: posted_label(job),
+          tone: if(days <= 14, do: "strong", else: "neutral"),
+          detail:
+            if(days <= 14,
+              do: "This role is fresh enough to prioritize.",
+              else: "Still inside Caio's public freshness window."
+            )
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp freshness_signal(_job), do: nil
+
+  defp company_activity_signal(%{open_jobs_count: count}) when is_integer(count) and count > 1 do
+    %{
+      label: "Company activity",
+      value: "#{count} open roles",
+      tone: "strong",
+      detail: "This company has multiple active postings in Caio."
+    }
+  end
+
+  defp company_activity_signal(_stats), do: nil
+
+  defp source_signal(job) do
+    %{
+      label: "Source",
+      value: source_label(job.source),
+      tone: "neutral",
+      detail: "Caio links back to the original public posting."
+    }
+  end
+
   def company_initials(job) do
     source = source_label(Map.get(job, :source))
 
