@@ -113,12 +113,13 @@ defmodule PortalWeb.AuthController do
 
   defp apply_after_github(conn, lead, job_id) do
     job = Jobs.get!(job_id)
+    apply_url = Jobs.apply_url(job)
 
     Accounts.record_interest(%{
       lead_id: lead.id,
       job_post_id: job.id,
       session_token: get_session(conn, :session_token),
-      source_url: job.source_url
+      source_url: apply_url
     })
 
     Analytics.capture("job_apply_clicked", analytics_id(conn, lead), %{
@@ -131,7 +132,7 @@ defmodule PortalWeb.AuthController do
     conn
     |> delete_session(:github_return_to)
     |> delete_session(:github_apply_job_id)
-    |> redirect(external: job.source_url)
+    |> redirect(external: apply_url)
   end
 
   defp github_error(conn, message) do

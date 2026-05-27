@@ -52,7 +52,7 @@
           <span>
             <%= if @job.company do %>
               <a
-                href={Portal.Jobs.company_path(@job.company)}
+                href={Portal.Jobs.company_path(@job)}
                 class="company-profile-link"
               >
                 {@job.company}
@@ -103,7 +103,7 @@
       <section class="side-card stats-card">
         <h2>Company stats</h2>
         <p>
-          Live platform signals for {@job.company || "this company"}. External review data can be layered in later from a company profile table.
+          <.company_stats_copy job={@job} />
         </p>
         <div class="stats-grid">
           <span><strong>{@company_stats.open_jobs_count}</strong><small>open roles</small></span>

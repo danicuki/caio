@@ -8,6 +8,7 @@ defmodule PortalWeb.CompanyControllerTest do
     insert_job("Caio Labs", "Senior Elixir Engineer", "Remote", "test")
     insert_job("Caio Labs", "Product Engineer", "Brazil", "arbeitnow")
     insert_job("Other Company", "Backend Engineer", "Remote", "test")
+    Portal.Jobs.refresh_companies()
 
     conn = get(conn, ~p"/companies/caio-labs")
     response = html_response(conn, 200)

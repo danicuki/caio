@@ -63,6 +63,7 @@ defmodule PortalWeb.JobController do
 
   def apply(conn, %{"id" => id}) do
     job = Jobs.get!(id)
+    apply_url = Jobs.apply_url(job)
 
     case lead_for_apply(conn, Map.get(conn.params, "lead", %{})) do
       {:ok, conn, lead} ->
@@ -70,7 +71,7 @@ defmodule PortalWeb.JobController do
           lead_id: lead.id,
           job_post_id: job.id,
           session_token: session_token(conn),
-          source_url: job.source_url
+          source_url: apply_url
         })
 
         Analytics.capture("job_apply_clicked", analytics_id(conn, lead), %{
@@ -80,7 +81,7 @@ defmodule PortalWeb.JobController do
           has_session_lead: not is_nil(get_session(conn, :lead_id))
         })
 
-        redirect(conn, external: job.source_url)
+        redirect(conn, external: apply_url)
 
       {:error, changeset} ->
         Analytics.capture("job_apply_lead_failed", session_token(conn), %{

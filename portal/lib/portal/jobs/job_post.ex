@@ -6,6 +6,7 @@ defmodule Portal.Jobs.JobPost do
     field :source_key, :string
     field :title, :string
     field :company, :string
+    field :company_id, :string
     field :location, :string
     field :remote, :integer
     field :employment_type, :string

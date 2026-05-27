@@ -88,7 +88,7 @@ defmodule PortalWeb.JobHTML do
           <%= if @locked or is_nil_or_empty?(@job.company) do %>
             <span>{@job.company || "Company"}</span>
           <% else %>
-            <a href={Portal.Jobs.company_path(@job.company)} class="job-company-link">
+            <a href={Portal.Jobs.company_path(@job)} class="job-company-link">
               {@job.company}
             </a>
           <% end %>
@@ -133,6 +133,25 @@ defmodule PortalWeb.JobHTML do
         <span>{remote_label(@job)}</span>
       <% end %>
     </p>
+    """
+  end
+
+  attr :job, :map, required: true
+
+  def company_stats_copy(assigns) do
+    ~H"""
+    <%= if @job.company do %>
+      <span>
+        Live platform signals for <a
+          href={Portal.Jobs.company_path(@job)}
+          class="company-profile-inline-link"
+        >{@job.company}</a>. External review data can be layered in later from a company profile table.
+      </span>
+    <% else %>
+      <span>
+        Live platform signals for this company. External review data can be layered in later from a company profile table.
+      </span>
+    <% end %>
     """
   end
 

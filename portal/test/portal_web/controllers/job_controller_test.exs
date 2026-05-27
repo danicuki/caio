@@ -85,6 +85,30 @@ defmodule PortalWeb.JobControllerTest do
     assert interest.lead_id == lead.id
   end
 
+  test "POST /jobs/:id/apply redirects to an apply URL override when present", %{conn: conn} do
+    job =
+      job_fixture(%{
+        source: "linkedin",
+        source_key: "4390863705",
+        source_url: "https://www.linkedin.com/jobs/view/4390863705"
+      })
+
+    {:ok, lead} = Accounts.upsert_lead(%{"email" => "member@example.com"})
+
+    conn =
+      conn
+      |> init_test_session(lead_id: lead.id)
+      |> post(~p"/jobs/#{job.id}/apply")
+
+    assert redirected_to(conn, 302) ==
+             "https://careers.terracon.com/job/midvale/supervisor-project-coordination/37184/85966092016"
+
+    interest = Repo.one!(from(i in JobInterest, where: i.job_post_id == ^job.id))
+
+    assert interest.source_url ==
+             "https://careers.terracon.com/job/midvale/supervisor-project-coordination/37184/85966092016"
+  end
+
   defp job_fixture(attrs \\ %{}) do
     Repo.insert!(
       %JobPost{

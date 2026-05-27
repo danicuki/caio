@@ -1,7 +1,9 @@
 defmodule Portal.Jobs do
   import Ecto.Query
 
+  alias Portal.Jobs.Company
   alias Portal.Jobs.JobPost
+  alias Portal.Jobs.JobUrlOverride
   alias Portal.Repo
 
   @guest_limit 10
@@ -12,6 +14,7 @@ defmodule Portal.Jobs do
     :source,
     :title,
     :company,
+    :company_id,
     :location,
     :remote,
     :employment_type,
@@ -85,35 +88,206 @@ defmodule Portal.Jobs do
     |> Repo.one!()
   end
 
-  def company_profile(company) when company not in [nil, ""] do
-    company_key = normalize_company(company)
-    base = company_query(company_key)
-
-    jobs =
-      base
-      |> order_by([j], desc: j.id)
-      |> limit(30)
-      |> select_list_fields()
-      |> Repo.all()
-
-    if jobs == [] do
-      nil
-    else
-      %{
-        name: jobs |> List.first() |> Map.get(:company),
-        slug: company_slug(company),
-        stats: company_profile_stats(base),
-        locations: company_top_values(base, :location_country, 8),
-        sources: company_top_values(base, :source, 8),
-        roles: jobs
-      }
+  def apply_url(%JobPost{} = job) do
+    case Repo.get_by(JobUrlOverride, source: job.source, source_key: job.source_key) do
+      nil -> job.source_url
+      override -> override.apply_url
     end
+  end
+
+  def company_profile(company) when company not in [nil, ""] do
+    company
+    |> company_slug()
+    |> company_profile_by_slug()
   end
 
   def company_profile(_company), do: nil
 
   def company_profile_by_slug(slug) when slug not in [nil, ""] do
     slug = normalize_slug(slug)
+
+    case Repo.get(Company, slug) do
+      nil -> legacy_company_profile_by_slug(slug)
+      company -> company_profile_from_record(company)
+    end
+  end
+
+  def company_profile_by_slug(_slug), do: nil
+
+  def sitemap_companies(limit \\ 2_000) do
+    rows =
+      Company
+      |> where([c], c.open_jobs_count > 0)
+      |> order_by([c], desc: c.open_jobs_count, asc: c.name)
+      |> limit(^limit)
+      |> select([c], %{
+        name: c.name,
+        slug: c.id,
+        latest_posted_at: c.latest_posted_at,
+        count: c.open_jobs_count
+      })
+      |> Repo.all()
+
+    if rows == [], do: legacy_sitemap_companies(limit), else: rows
+  end
+
+  def refresh_companies do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    aliases =
+      Repo.query!("""
+      SELECT lower(trim(company)) AS normalized_name, min(trim(company)) AS display_name, count(*) AS jobs_count
+      FROM job_posts
+      WHERE company IS NOT NULL AND trim(company) != ''
+      GROUP BY lower(trim(company))
+      """)
+      |> rows_to_aliases(now)
+
+    aliases
+    |> Enum.map(fn alias_row ->
+      %{
+        id: alias_row.company_id,
+        name: alias_row.display_name,
+        created_at: now,
+        updated_at: now
+      }
+    end)
+    |> Enum.uniq_by(& &1.id)
+    |> insert_company_rows(on_conflict: :nothing)
+
+    aliases
+    |> Enum.map(fn alias_row ->
+      Map.take(alias_row, [
+        :company_id,
+        :normalized_name,
+        :display_name,
+        :jobs_count,
+        :created_at,
+        :updated_at
+      ])
+    end)
+    |> insert_alias_rows()
+
+    Repo.query!("""
+    UPDATE job_posts
+    SET company_id = (
+      SELECT company_id
+      FROM company_aliases
+      WHERE company_aliases.normalized_name = lower(trim(job_posts.company))
+      LIMIT 1
+    )
+    WHERE company IS NOT NULL
+      AND trim(company) != ''
+      AND (
+        company_id IS NULL
+        OR company_id = ''
+        OR company_id != (
+          SELECT company_id
+          FROM company_aliases
+          WHERE company_aliases.normalized_name = lower(trim(job_posts.company))
+          LIMIT 1
+        )
+      )
+    """)
+
+    refresh_company_stats(now)
+  end
+
+  def company_slug(company) do
+    company
+    |> to_string()
+    |> String.downcase()
+    |> String.replace("&", "and")
+    |> String.replace(~r/[^a-z0-9]+/u, "-")
+    |> String.trim("-")
+    |> case do
+      "" -> "company"
+      slug -> slug
+    end
+  end
+
+  def company_path(%JobPost{company_id: company_id}) when company_id not in [nil, ""] do
+    "/companies/#{company_id}"
+  end
+
+  def company_path(%JobPost{company: company}), do: company_path(company)
+
+  def company_path(company), do: "/companies/#{company_slug(company)}"
+
+  defp normalize_slug(slug) do
+    slug
+    |> to_string()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9-]+/u, "-")
+    |> String.replace(~r/-+/, "-")
+    |> String.trim("-")
+  end
+
+  def company_stats(%JobPost{company_id: company_id, company: company})
+      when company_id not in [nil, ""] do
+    company_id
+    |> company_stats_by_slug()
+    |> case do
+      nil when company not in [nil, ""] -> legacy_company_stats(company)
+      nil -> empty_company_stats()
+      stats -> stats
+    end
+  end
+
+  def company_stats(%JobPost{company: company}) when company not in [nil, ""] do
+    company
+    |> company_slug()
+    |> company_stats_by_slug()
+    |> case do
+      nil -> legacy_company_stats(company)
+      stats -> stats
+    end
+  end
+
+  def company_stats(_job), do: empty_company_stats()
+
+  defp company_profile_from_record(%Company{} = company) do
+    roles =
+      JobPost
+      |> public_scope()
+      |> where([j], j.company_id == ^company.id)
+      |> order_by([j], desc: j.id)
+      |> limit(30)
+      |> select_list_fields()
+      |> Repo.all()
+
+    %{
+      name: company.name,
+      slug: company.id,
+      logo_url: company.logo_url,
+      website_url: company.website_url,
+      description: company.description,
+      stats: company_stats_from_record(company),
+      locations: decode_company_signals(company.top_locations_json),
+      sources: decode_company_signals(company.top_sources_json),
+      roles: roles
+    }
+  end
+
+  defp company_stats_by_slug(slug) do
+    case Repo.get(Company, slug) do
+      nil -> nil
+      company -> company_stats_from_record(company)
+    end
+  end
+
+  defp company_stats_from_record(%Company{} = company) do
+    %{
+      open_jobs_count: company.open_jobs_count || 0,
+      source_count: company.source_count || 0,
+      location_count: company.location_count || 0,
+      remote_count: company.remote_count || 0,
+      salary_count: company.salary_count || 0,
+      latest_posted_at: company.latest_posted_at
+    }
+  end
+
+  defp legacy_company_profile_by_slug(slug) do
     base = company_slug_query(slug)
 
     jobs =
@@ -131,6 +305,9 @@ defmodule Portal.Jobs do
       %{
         name: company,
         slug: company_slug(company),
+        logo_url: nil,
+        website_url: nil,
+        description: nil,
         stats: company_profile_stats(base),
         locations: company_top_values(base, :location_country, 8),
         sources: company_top_values(base, :source, 8),
@@ -139,9 +316,7 @@ defmodule Portal.Jobs do
     end
   end
 
-  def company_profile_by_slug(_slug), do: nil
-
-  def sitemap_companies(limit \\ 2_000) do
+  defp legacy_sitemap_companies(limit) do
     JobPost
     |> public_scope()
     |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
@@ -164,31 +339,7 @@ defmodule Portal.Jobs do
     end)
   end
 
-  def company_slug(company) do
-    company
-    |> to_string()
-    |> String.downcase()
-    |> String.replace("&", "and")
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
-    |> case do
-      "" -> "company"
-      slug -> slug
-    end
-  end
-
-  def company_path(company), do: "/companies/#{company_slug(company)}"
-
-  defp normalize_slug(slug) do
-    slug
-    |> to_string()
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9-]+/u, "-")
-    |> String.replace(~r/-+/, "-")
-    |> String.trim("-")
-  end
-
-  def company_stats(%JobPost{company: company}) when company not in [nil, ""] do
+  defp legacy_company_stats(company) do
     company_key = normalize_company(company)
     cutoff = public_cutoff_date()
 
@@ -208,7 +359,7 @@ defmodule Portal.Jobs do
     |> Repo.one()
   end
 
-  def company_stats(_job) do
+  defp empty_company_stats do
     %{
       open_jobs_count: 0,
       source_count: 0,
@@ -217,11 +368,159 @@ defmodule Portal.Jobs do
     }
   end
 
-  defp company_query(company_key) do
-    JobPost
-    |> public_scope()
-    |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
-    |> where([j], fragment("lower(trim(?))", j.company) == ^company_key)
+  defp rows_to_aliases(%{rows: rows}, now) do
+    Enum.map(rows, fn [normalized_name, display_name, jobs_count] ->
+      %{
+        company_id: company_slug(display_name),
+        normalized_name: normalized_name,
+        display_name: display_name,
+        jobs_count: jobs_count,
+        created_at: now,
+        updated_at: now
+      }
+    end)
+  end
+
+  defp insert_company_rows([], _opts), do: :ok
+
+  defp insert_company_rows(rows, opts) do
+    rows
+    |> Enum.chunk_every(500)
+    |> Enum.each(fn chunk ->
+      Repo.insert_all(Company, chunk,
+        on_conflict: Keyword.fetch!(opts, :on_conflict),
+        conflict_target: :id
+      )
+    end)
+  end
+
+  defp insert_alias_rows([]), do: :ok
+
+  defp insert_alias_rows(rows) do
+    rows
+    |> Enum.chunk_every(500)
+    |> Enum.each(fn chunk ->
+      Repo.insert_all("company_aliases", chunk,
+        on_conflict: {:replace, [:company_id, :display_name, :jobs_count, :updated_at]},
+        conflict_target: :normalized_name
+      )
+    end)
+  end
+
+  defp refresh_company_stats(now) do
+    top_locations = top_company_values_by(:location_country)
+    top_sources = top_company_values_by(:source)
+
+    rows =
+      Repo.query!(
+        """
+        SELECT
+          company_id,
+          min(trim(company)) AS name,
+          count(*) AS open_jobs_count,
+          COUNT(DISTINCT NULLIF(lower(trim(source)), '')) AS source_count,
+          COUNT(DISTINCT NULLIF(lower(trim(location_country)), '')) AS location_count,
+          SUM(CASE WHEN remote = 1 OR lower(coalesce(location_scope, '')) LIKE '%remote%' THEN 1 ELSE 0 END) AS remote_count,
+          COUNT(NULLIF(salary, '')) AS salary_count,
+          max(published_at) AS latest_posted_at
+        FROM job_posts
+        WHERE company_id IS NOT NULL
+          AND company_id != ''
+          AND (published_at IS NULL OR published_at = '' OR published_at >= ?)
+        GROUP BY company_id
+        """,
+        [public_cutoff_date()]
+      ).rows
+      |> Enum.map(fn [
+                       company_id,
+                       name,
+                       open_jobs_count,
+                       source_count,
+                       location_count,
+                       remote_count,
+                       salary_count,
+                       latest_posted_at
+                     ] ->
+        %{
+          id: company_id,
+          name: name,
+          open_jobs_count: open_jobs_count || 0,
+          source_count: source_count || 0,
+          location_count: location_count || 0,
+          remote_count: remote_count || 0,
+          salary_count: salary_count || 0,
+          latest_posted_at: latest_posted_at,
+          top_locations_json: Jason.encode!(Map.get(top_locations, company_id, [])),
+          top_sources_json: Jason.encode!(Map.get(top_sources, company_id, [])),
+          refreshed_at: now,
+          created_at: now,
+          updated_at: now
+        }
+      end)
+
+    rows
+    |> Enum.chunk_every(500)
+    |> Enum.each(fn chunk ->
+      Repo.insert_all(Company, chunk,
+        on_conflict:
+          {:replace,
+           [
+             :name,
+             :open_jobs_count,
+             :source_count,
+             :location_count,
+             :remote_count,
+             :salary_count,
+             :latest_posted_at,
+             :top_locations_json,
+             :top_sources_json,
+             :refreshed_at,
+             :updated_at
+           ]},
+        conflict_target: :id
+      )
+    end)
+
+    %{companies: length(rows)}
+  end
+
+  defp top_company_values_by(field) when field in [:location_country, :source] do
+    column = Atom.to_string(field)
+
+    Repo.query!(
+      """
+      SELECT company_id, #{column}, count(*) AS value_count
+      FROM job_posts
+      WHERE company_id IS NOT NULL
+        AND company_id != ''
+        AND #{column} IS NOT NULL
+        AND trim(#{column}) != ''
+        AND (published_at IS NULL OR published_at = '' OR published_at >= ?)
+      GROUP BY company_id, #{column}
+      ORDER BY company_id ASC, value_count DESC, #{column} ASC
+      """,
+      [public_cutoff_date()]
+    )
+    |> Map.fetch!(:rows)
+    |> Enum.reduce(%{}, fn [company_id, label, count], acc ->
+      values = Map.get(acc, company_id, [])
+
+      if length(values) >= 8 do
+        acc
+      else
+        Map.put(acc, company_id, values ++ [%{label: label, count: count}])
+      end
+    end)
+  end
+
+  defp decode_company_signals(nil), do: []
+
+  defp decode_company_signals(json) do
+    json
+    |> Jason.decode!()
+    |> Enum.map(fn %{"label" => label, "count" => count} -> %{label: label, count: count} end)
+  rescue
+    _ -> []
   end
 
   defp company_slug_query(slug) do

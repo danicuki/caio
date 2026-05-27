@@ -45,16 +45,17 @@ module Standalone
         sql = +"BEGIN;\n"
         batch.each do |job|
           normalized = Normalizer.normalize(job)
+          company_id = company_slug(job[:company])
           sql << <<~SQL
             INSERT INTO job_posts (
-              source, source_key, title, company, location, remote, employment_type,
+              source, source_key, title, company, company_id, location, remote, employment_type,
               category, salary, source_url, published_at, tags_json, description,
               raw_json, salary_min, salary_max, salary_currency, salary_period,
               location_city, location_state, location_country, location_continent,
               location_scope, created_at, updated_at
             ) VALUES (
               #{quote(source_name)}, #{quote(job.fetch(:source_key))}, #{quote(job.fetch(:title))},
-              #{quote(job[:company])}, #{quote(job[:location])}, #{boolean(job[:remote])},
+              #{quote(job[:company])}, #{quote(company_id)}, #{quote(job[:location])}, #{boolean(job[:remote])},
               #{quote(job[:employment_type])}, #{quote(job[:category])}, #{quote(job[:salary])},
               #{quote(job.fetch(:source_url))}, #{quote(job[:published_at])}, #{quote(JSON.generate(job[:tags] || []))},
               #{quote(job[:description])}, #{quote(JSON.generate(job[:raw]))},
@@ -67,6 +68,7 @@ module Standalone
             ON CONFLICT(source, source_key) DO UPDATE SET
               title = excluded.title,
               company = excluded.company,
+              company_id = excluded.company_id,
               location = excluded.location,
               remote = excluded.remote,
               employment_type = excluded.employment_type,
@@ -89,6 +91,7 @@ module Standalone
             ON CONFLICT(source_url) DO UPDATE SET
               title = excluded.title,
               company = excluded.company,
+              company_id = excluded.company_id,
               location = excluded.location,
               remote = excluded.remote,
               employment_type = excluded.employment_type,
@@ -126,17 +129,18 @@ module Standalone
 
       sql = <<~SQL
         INSERT INTO job_posts (
-          source, source_key, title, company, location, remote, employment_type,
+          source, source_key, title, company, company_id, location, remote, employment_type,
           category, salary, source_url, published_at, tags_json, description,
           raw_json, salary_min, salary_max, salary_currency, salary_period,
           location_city, location_state, location_country, location_continent,
           location_scope, created_at, updated_at
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
         ON CONFLICT(source, source_key) DO UPDATE SET
           title = excluded.title,
           company = excluded.company,
+          company_id = excluded.company_id,
           location = excluded.location,
           remote = excluded.remote,
           employment_type = excluded.employment_type,
@@ -159,6 +163,7 @@ module Standalone
         ON CONFLICT(source_url) DO UPDATE SET
           title = excluded.title,
           company = excluded.company,
+          company_id = excluded.company_id,
           location = excluded.location,
           remote = excluded.remote,
           employment_type = excluded.employment_type,
@@ -184,6 +189,7 @@ module Standalone
         UPDATE job_posts SET
           title = ?,
           company = ?,
+          company_id = ?,
           location = ?,
           remote = ?,
           employment_type = ?,
@@ -215,11 +221,13 @@ module Standalone
           source_url = job.fetch(:source_url)
           tags_json = JSON.generate(job[:tags] || [])
           raw_json = JSON.generate(job[:raw])
+          company_id = company_slug(job[:company])
 
           if duplicate_url_for_other_key?(db, source_url, source_name, source_key)
             update_by_url_statement.execute(
               job.fetch(:title),
               job[:company],
+              company_id,
               job[:location],
               native_boolean(job[:remote]),
               job[:employment_type],
@@ -247,6 +255,7 @@ module Standalone
               source_key,
               job.fetch(:title),
               job[:company],
+              company_id,
               job[:location],
               native_boolean(job[:remote]),
               job[:employment_type],
@@ -369,6 +378,7 @@ module Standalone
           source_key TEXT NOT NULL,
           title TEXT NOT NULL,
           company TEXT,
+          company_id TEXT,
           location TEXT,
           remote INTEGER,
           employment_type TEXT,
@@ -448,6 +458,7 @@ module Standalone
         );
       SQL
       add_column_if_missing("job_posts", "salary_min", "REAL")
+      add_column_if_missing("job_posts", "company_id", "TEXT")
       add_column_if_missing("job_posts", "salary_max", "REAL")
       add_column_if_missing("job_posts", "salary_currency", "TEXT")
       add_column_if_missing("job_posts", "salary_period", "TEXT")
@@ -457,6 +468,10 @@ module Standalone
       add_column_if_missing("job_posts", "location_continent", "TEXT")
       add_column_if_missing("job_posts", "location_scope", "TEXT")
       execute(<<~SQL)
+        CREATE INDEX IF NOT EXISTS index_job_posts_company_id_id
+          ON job_posts(company_id, id DESC);
+        CREATE INDEX IF NOT EXISTS index_job_posts_company_id_published_at
+          ON job_posts(company_id, published_at);
         CREATE INDEX IF NOT EXISTS index_job_posts_salary_min ON job_posts(salary_min);
         CREATE INDEX IF NOT EXISTS index_job_posts_salary_max ON job_posts(salary_max);
         CREATE INDEX IF NOT EXISTS index_job_posts_location_city ON job_posts(location_city);
@@ -503,6 +518,15 @@ module Standalone
       return nil if value.nil?
 
       value ? 1 : 0
+    end
+
+    def company_slug(company)
+      slug = company.to_s.downcase
+        .gsub("&", "and")
+        .gsub(/[^a-z0-9]+/, "-")
+        .gsub(/\A-+|-+\z/, "")
+
+      slug.empty? ? nil : slug
     end
 
     def duplicate_url_for_other_key?(db, source_url, source_name, source_key)
