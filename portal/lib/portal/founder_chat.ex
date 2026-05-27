@@ -69,7 +69,8 @@ defmodule Portal.FounderChat do
   def create_visitor_message(conversation, body) do
     body = clean_body(body)
 
-    with {:ok, message} <- create_message(conversation, "visitor", body) do
+    with {:ok, conversation} <- ensure_telegram_thread(conversation),
+         {:ok, message} <- create_message(conversation, "visitor", body) do
       Telegram.send_visitor_message(conversation, message)
       {:ok, message}
     end
@@ -135,30 +136,31 @@ defmodule Portal.FounderChat do
     |> Repo.insert()
   end
 
-  defp ensure_telegram_thread(%Conversation{telegram_chat_id: chat_id} = conversation)
-       when chat_id not in [nil, ""] do
-    {:ok, conversation}
-  end
-
   defp ensure_telegram_thread(conversation) do
     config = config()
     chat_id = to_string(config[:telegram_chat_id])
+    forum_topics? = truthy?(config[:telegram_forum_topics])
 
-    thread_id =
-      if truthy?(config[:telegram_forum_topics]) do
-        Telegram.create_topic(conversation)
-      end
+    if conversation.telegram_chat_id == chat_id and
+         (!forum_topics? or conversation.telegram_thread_id not in [nil, ""]) do
+      {:ok, conversation}
+    else
+      thread_id =
+        if forum_topics? do
+          Telegram.create_topic(conversation)
+        end
 
-    conversation
-    |> Conversation.changeset(%{
-      telegram_chat_id: chat_id,
-      telegram_thread_id: to_string(thread_id || "")
-    })
-    |> Repo.update()
-    |> tap(fn
-      {:ok, updated} -> Telegram.send_conversation_started(updated)
-      _ -> :ok
-    end)
+      conversation
+      |> Conversation.changeset(%{
+        telegram_chat_id: chat_id,
+        telegram_thread_id: to_string(thread_id || "")
+      })
+      |> Repo.update()
+      |> tap(fn
+        {:ok, updated} -> Telegram.send_conversation_started(updated)
+        _ -> :ok
+      end)
+    end
   end
 
   defp config, do: Application.get_env(:portal, :founder_chat, [])
