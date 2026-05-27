@@ -600,16 +600,74 @@ defmodule PortalWeb.JobHTML do
     if Regex.match?(~r/<(p|ul|ol|li|h2|h3|h4|blockquote|br)\b/i, text) do
       text
     else
-      paragraphs =
-        text
-        |> String.split(~r/\n{2,}/, trim: true)
-        |> Enum.map_join(
-          "",
-          &"<p>#{Phoenix.HTML.html_escape(&1) |> Phoenix.HTML.safe_to_string()}</p>"
-        )
-
-      paragraphs
+      format_plain_description(text)
     end
+  end
+
+  defp format_plain_description(text) do
+    text
+    |> mark_plain_headings()
+    |> String.split(~r/\n{2,}/, trim: true)
+    |> Enum.map_join("", &plain_description_block/1)
+  end
+
+  defp mark_plain_headings(text) do
+    headings = [
+      "Preferred qualifications",
+      "Minimum qualifications",
+      "Minimum requirements",
+      "Essential roles and responsibilities",
+      "Roles and responsibilities",
+      "About the company",
+      "About the team",
+      "About the role",
+      "About the job",
+      "Responsibilities",
+      "Qualifications",
+      "Requirements",
+      "What are we looking for in you",
+      "What we offer colleagues",
+      "Who you are",
+      "What you’ll do",
+      "What you'll do",
+      "Who we are",
+      "Benefits",
+      "About Canonical",
+      "Canonical is an equal opportunity employer",
+      "The role entails",
+      "The role"
+    ]
+
+    1..2
+    |> Enum.reduce(text, fn _, acc ->
+      Enum.reduce(headings, acc, &mark_plain_heading/2)
+    end)
+    |> String.replace(~r/\n{3,}/, "\n\n")
+    |> String.trim()
+  end
+
+  defp mark_plain_heading(heading, text) do
+    escaped = Regex.escape(heading)
+
+    Regex.replace(
+      ~r/(^|[.!?]\s+|\n+|[a-z0-9\)]\s+)\s*(#{escaped})(?=\s+[A-Z0-9]|\s*$)/,
+      text,
+      "\\1\n\n### \\2\n\n"
+    )
+  end
+
+  defp plain_description_block("### " <> heading) do
+    "<h3>#{html_escape_to_string(heading)}</h3>"
+  end
+
+  defp plain_description_block(text) do
+    "<p>#{html_escape_to_string(text)}</p>"
+  end
+
+  defp html_escape_to_string(value) do
+    value
+    |> Phoenix.HTML.html_escape()
+    |> Phoenix.HTML.safe_to_string()
   end
 
   defp html_to_text(text) do

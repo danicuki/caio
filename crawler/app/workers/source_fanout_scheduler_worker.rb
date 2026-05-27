@@ -13,6 +13,16 @@ class SourceFanoutSchedulerWorker
 
     SourceFanoutWorker.perform_async if current_depth < target_depth
     Web3careerDescriptionBackfillWorker.perform_async if detail_depth < detail_target_depth
+    enqueue_once(HimalayasDescriptionRepairWorker, Integer(ENV.fetch("HIMALAYAS_DESCRIPTION_REPAIR_BATCH_SIZE", "1000")))
     self.class.perform_in(Integer(ENV.fetch("SOURCE_FANOUT_INTERVAL_SECONDS", "120")))
+  end
+
+  private
+
+  def enqueue_once(worker_class, *args)
+    return if Sidekiq::Queue.new("control").any? { |job| job.klass == worker_class.name }
+    return if Sidekiq::ScheduledSet.new.any? { |job| job.klass == worker_class.name }
+
+    worker_class.perform_async(*args)
   end
 end

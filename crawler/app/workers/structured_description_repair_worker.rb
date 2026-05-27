@@ -50,7 +50,14 @@ class StructuredDescriptionRepairWorker
     query =
       JobPost
       .where("id > ?", cursor)
-      .where("raw_json LIKE ?", "%<%")
+      .where(
+        "raw_json LIKE ? OR raw_json LIKE ? OR raw_json LIKE ? OR raw_json LIKE ? OR raw_json LIKE ?",
+        "%<p%",
+        "%<ul%",
+        "%<ol%",
+        "%<li%",
+        "%<br%"
+      )
       .where("description IS NULL OR description NOT LIKE ?", "%<%")
 
     query = query.where(source: source) if source

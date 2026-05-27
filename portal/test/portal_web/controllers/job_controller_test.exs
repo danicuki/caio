@@ -49,6 +49,42 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Intro Aufgaben Plan systems Coordinate teams"
   end
 
+  test "GET /jobs/:id formats plain descriptions with common job headings", %{conn: conn} do
+    job =
+      job_fixture(%{
+        description:
+          "Who we are About Stripe Stripe is a financial infrastructure platform. About the team The policy team works globally. What you’ll do Support public affairs campaigns. Responsibilities Coordinate launches. Minimum requirements Minimum 3+ years of experience. Preferred qualifications Policy ecosystem relationships."
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ "<h3>Who we are</h3>"
+    assert response =~ "<h3>About the team</h3>"
+    assert response =~ "<h3>What you’ll do</h3>"
+    assert response =~ "<h3>Responsibilities</h3>"
+    assert response =~ "<h3>Minimum requirements</h3>"
+    assert response =~ "<h3>Preferred qualifications</h3>"
+  end
+
+  test "GET /jobs/:id formats Himalayas-style plain descriptions without punctuation before headings",
+       %{conn: conn} do
+    job =
+      job_fixture(%{
+        description:
+          "Canonical builds Ubuntu for the world The role entails Management of a professional support team Operational control and accountability What are we looking for in you Extensive CLI experience with Linux What we offer colleagues Distributed work environment About Canonical Canonical is a pioneering tech firm Canonical is an equal opportunity employer We foster a workplace free from discrimination."
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ "<h3>The role entails</h3>"
+    assert response =~ "<h3>What are we looking for in you</h3>"
+    assert response =~ "<h3>What we offer colleagues</h3>"
+    assert response =~ "<h3>About Canonical</h3>"
+    assert response =~ "<h3>Canonical is an equal opportunity employer</h3>"
+  end
+
   test "POST /jobs/:id/apply creates a lead for guest applicants", %{conn: conn} do
     job = job_fixture()
 
