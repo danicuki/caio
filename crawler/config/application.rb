@@ -12,6 +12,6 @@ module TechJobsCrawler
     config.load_defaults 8.1
     config.active_job.queue_adapter = :sidekiq
     config.time_zone = "UTC"
+    config.active_record.dump_schema_after_migration = false
   end
 end
-
