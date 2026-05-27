@@ -141,12 +141,6 @@ defmodule Portal.Jobs do
 
   def company_profile_by_slug(_slug), do: nil
 
-  def highlighted_companies(names) do
-    names
-    |> Enum.map(&company_profile/1)
-    |> Enum.reject(&is_nil/1)
-  end
-
   def sitemap_companies(limit \\ 2_000) do
     JobPost
     |> public_scope()

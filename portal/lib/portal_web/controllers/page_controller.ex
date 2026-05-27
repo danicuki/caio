@@ -6,10 +6,6 @@ defmodule PortalWeb.PageController do
   def home(conn, _params) do
     conn = ensure_session_token(conn)
     sample_jobs = Jobs.sample(6)
-
-    highlighted_companies =
-      Jobs.highlighted_companies(["Stripe", "Figma", "GitHub", "Shopify", "Vercel"])
-
     total_jobs = Jobs.total_count()
     lead = current_lead(conn)
 
@@ -25,7 +21,7 @@ defmodule PortalWeb.PageController do
       canonical_path: "/",
       analytics_distinct_id: analytics_id(conn, lead),
       sample_jobs: sample_jobs,
-      highlighted_companies: highlighted_companies,
+      highlighted_companies: ["Stripe", "Figma", "GitHub", "Shopify", "Vercel"],
       total_jobs: total_jobs,
       lead: lead
     )
