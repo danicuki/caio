@@ -9,7 +9,7 @@ defmodule PortalWeb.CompanyControllerTest do
     insert_job("Caio Labs", "Product Engineer", "Brazil", "arbeitnow")
     insert_job("Other Company", "Backend Engineer", "Remote", "test")
 
-    conn = get(conn, ~p"/companies/caio-labs?name=Caio Labs")
+    conn = get(conn, ~p"/companies/caio-labs")
     response = html_response(conn, 200)
 
     assert response =~ "Caio Labs jobs on Caio"

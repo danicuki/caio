@@ -112,16 +112,86 @@ defmodule Portal.Jobs do
 
   def company_profile(_company), do: nil
 
+  def company_profile_by_slug(slug) when slug not in [nil, ""] do
+    slug = normalize_slug(slug)
+    base = company_slug_query(slug)
+
+    jobs =
+      base
+      |> order_by([j], desc: j.id)
+      |> limit(30)
+      |> select_list_fields()
+      |> Repo.all()
+
+    if jobs == [] do
+      nil
+    else
+      company = jobs |> List.first() |> Map.get(:company)
+
+      %{
+        name: company,
+        slug: company_slug(company),
+        stats: company_profile_stats(base),
+        locations: company_top_values(base, :location_country, 8),
+        sources: company_top_values(base, :source, 8),
+        roles: jobs
+      }
+    end
+  end
+
+  def company_profile_by_slug(_slug), do: nil
+
+  def highlighted_companies(names) do
+    names
+    |> Enum.map(&company_profile/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  def sitemap_companies(limit \\ 2_000) do
+    JobPost
+    |> public_scope()
+    |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
+    |> group_by([j], fragment("lower(trim(?))", j.company))
+    |> order_by([j], desc: count(j.id))
+    |> limit(^limit)
+    |> select([j], %{
+      name: fragment("min(trim(?))", j.company),
+      slug:
+        fragment(
+          "lower(trim(replace(replace(replace(replace(replace(?, '.', ''), '&', 'and'), '/', '-'), ' ', '-'), '--', '-'), '-'))",
+          j.company
+        ),
+      latest_posted_at: max(j.published_at),
+      count: count(j.id)
+    })
+    |> Repo.all()
+    |> Enum.map(fn company ->
+      %{company | slug: company_slug(company.name)}
+    end)
+  end
+
   def company_slug(company) do
     company
     |> to_string()
     |> String.downcase()
+    |> String.replace("&", "and")
     |> String.replace(~r/[^a-z0-9]+/u, "-")
     |> String.trim("-")
     |> case do
       "" -> "company"
       slug -> slug
     end
+  end
+
+  def company_path(company), do: "/companies/#{company_slug(company)}"
+
+  defp normalize_slug(slug) do
+    slug
+    |> to_string()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9-]+/u, "-")
+    |> String.replace(~r/-+/, "-")
+    |> String.trim("-")
   end
 
   def company_stats(%JobPost{company: company}) when company not in [nil, ""] do
@@ -158,6 +228,39 @@ defmodule Portal.Jobs do
     |> public_scope()
     |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
     |> where([j], fragment("lower(trim(?))", j.company) == ^company_key)
+  end
+
+  defp company_slug_query(slug) do
+    JobPost
+    |> public_scope()
+    |> where([j], not is_nil(j.company) and fragment("trim(?)", j.company) != "")
+    |> where(
+      [j],
+      fragment(
+        """
+        lower(trim(
+          replace(
+            replace(
+              replace(
+                replace(
+                  replace(
+                    replace(
+                      replace(
+                        replace(
+                          replace(?, '&', 'and'),
+                        '''', ''),
+                      '.', ''),
+                    ',', ''),
+                  '(', ''),
+                ')', ''),
+              '/', '-'),
+            ' ', '-'),
+          '--', '-'),
+        '-'))
+        """,
+        j.company
+      ) == ^slug
+    )
   end
 
   defp company_profile_stats(query) do

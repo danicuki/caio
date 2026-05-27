@@ -750,8 +750,7 @@ button {
   border-bottom: 0;
 }
 
-.mini-job:hover,
-.job-card:hover {
+.mini-job:hover {
   background: var(--paper);
 }
 
@@ -802,12 +801,21 @@ button {
   text-transform: uppercase;
 }
 
+.logo-strip a {
+  text-decoration: none;
+}
+
 .logo-strip strong {
   color: var(--ink-2);
   font-family: var(--serif);
   font-size: clamp(22px, 2.6vw, 34px);
   font-weight: 400;
   opacity: 0.72;
+}
+
+.logo-strip a:hover strong {
+  color: var(--green);
+  opacity: 1;
 }
 
 :root[data-theme="dark"] .logo-strip strong {
@@ -1326,9 +1334,16 @@ button {
   font-size: 12px;
 }
 
-.job-card-topline span:first-child {
+.job-card-topline span:first-child,
+.job-company-link {
   color: var(--ink-2);
   font-weight: 700;
+}
+
+.job-company-link:hover {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .job-card h3 {
@@ -1336,6 +1351,14 @@ button {
   color: var(--ink);
   font-size: 17px;
   line-height: 1.25;
+}
+
+.job-card h3 a {
+  color: inherit;
+}
+
+.job-card h3 a:hover {
+  color: var(--green);
 }
 
 .job-meta {

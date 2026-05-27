@@ -5,12 +5,11 @@ defmodule PortalWeb.CompanyController do
   alias Portal.Analytics
   alias Portal.Jobs
 
-  def show(conn, %{"slug" => slug} = params) do
+  def show(conn, %{"slug" => slug}) do
     conn = ensure_session_token(conn)
     lead = current_lead(conn)
-    company = params["name"] || slug_to_name(slug)
 
-    case Jobs.company_profile(company) do
+    case Jobs.company_profile_by_slug(slug) do
       nil ->
         conn
         |> put_status(:not_found)
@@ -27,7 +26,7 @@ defmodule PortalWeb.CompanyController do
           page_title: "#{profile.name} jobs",
           meta_description:
             "#{profile.stats.open_jobs_count} open #{profile.name} roles indexed by Caio, with source, location, and salary signals.",
-          canonical_path: ~p"/companies/#{profile.slug}?name=#{profile.name}",
+          canonical_path: ~p"/companies/#{profile.slug}",
           analytics_distinct_id: analytics_id(conn, lead),
           profile: profile,
           lead: lead
@@ -46,10 +45,4 @@ defmodule PortalWeb.CompanyController do
 
   defp analytics_id(conn, nil), do: "session:#{get_session(conn, :session_token)}"
   defp analytics_id(conn, lead), do: "lead:#{lead.id}:#{get_session(conn, :session_token)}"
-
-  defp slug_to_name(slug) do
-    slug
-    |> to_string()
-    |> String.replace("-", " ")
-  end
 end

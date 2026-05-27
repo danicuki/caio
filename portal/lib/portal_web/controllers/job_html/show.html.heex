@@ -52,9 +52,7 @@
           <span>
             <%= if @job.company do %>
               <a
-                href={
-                  ~p"/companies/#{Portal.Jobs.company_slug(@job.company)}?name=#{@job.company}"
-                }
+                href={Portal.Jobs.company_path(@job.company)}
                 class="company-profile-link"
               >
                 {@job.company}

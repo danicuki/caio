@@ -6,6 +6,10 @@ defmodule PortalWeb.PageController do
   def home(conn, _params) do
     conn = ensure_session_token(conn)
     sample_jobs = Jobs.sample(6)
+
+    highlighted_companies =
+      Jobs.highlighted_companies(["Stripe", "Figma", "GitHub", "Shopify", "Vercel"])
+
     total_jobs = Jobs.total_count()
     lead = current_lead(conn)
 
@@ -21,9 +25,50 @@ defmodule PortalWeb.PageController do
       canonical_path: "/",
       analytics_distinct_id: analytics_id(conn, lead),
       sample_jobs: sample_jobs,
+      highlighted_companies: highlighted_companies,
       total_jobs: total_jobs,
       lead: lead
     )
+  end
+
+  def sitemap(conn, _params) do
+    conn
+    |> put_resp_content_type("application/xml")
+    |> text("""
+    <?xml version="1.0" encoding="UTF-8"?>
+    <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <sitemap><loc>https://caio-jobs.com/sitemap-static.xml</loc></sitemap>
+      <sitemap><loc>https://caio-jobs.com/sitemap-companies.xml</loc></sitemap>
+    </sitemapindex>
+    """)
+  end
+
+  def sitemap_static(conn, _params) do
+    urls = [
+      "/",
+      "/jobs",
+      "/about",
+      "/how-it-works",
+      "/pricing",
+      "/privacy",
+      "/terms",
+      "/status"
+    ]
+
+    render_urlset(conn, Enum.map(urls, &%{loc: "https://caio-jobs.com#{&1}"}))
+  end
+
+  def sitemap_companies(conn, _params) do
+    urls =
+      Jobs.sitemap_companies()
+      |> Enum.map(fn company ->
+        %{
+          loc: "https://caio-jobs.com/companies/#{company.slug}",
+          lastmod: company.latest_posted_at
+        }
+      end)
+
+    render_urlset(conn, urls)
   end
 
   def about(conn, _params) do
@@ -234,6 +279,47 @@ defmodule PortalWeb.PageController do
 
   def changelog(conn, _params) do
     redirect(conn, external: "https://github.com/danicuki/caio/commits/main")
+  end
+
+  defp render_urlset(conn, urls) do
+    body =
+      [
+        ~s(<?xml version="1.0" encoding="UTF-8"?>),
+        ~s(<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">),
+        Enum.map(urls, &sitemap_url/1),
+        "</urlset>"
+      ]
+      |> List.flatten()
+      |> Enum.join("\n")
+
+    conn
+    |> put_resp_content_type("application/xml")
+    |> text(body)
+  end
+
+  defp sitemap_url(%{loc: loc} = url) do
+    lastmod = url[:lastmod]
+
+    [
+      "  <url>",
+      "    <loc>#{xml_escape(loc)}</loc>",
+      if(lastmod in [nil, ""],
+        do: nil,
+        else: "    <lastmod>#{String.slice(to_string(lastmod), 0, 10)}</lastmod>"
+      ),
+      "  </url>"
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n")
+  end
+
+  defp xml_escape(value) do
+    value
+    |> to_string()
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
   end
 
   defp render_static(conn, assigns) do

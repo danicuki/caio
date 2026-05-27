@@ -71,11 +71,18 @@
 
   <section class="logo-strip" aria-label="Example indexed companies">
     <span>Indexed from public sources around</span>
-    <strong>Stripe</strong>
-    <strong>Figma</strong>
-    <strong>GitHub</strong>
-    <strong>Shopify</strong>
-    <strong>Vercel</strong>
+    <%= for company <- @highlighted_companies do %>
+      <a href={Portal.Jobs.company_path(company.name)}>
+        <strong>{company.name}</strong>
+      </a>
+    <% end %>
+    <%= if @highlighted_companies == [] do %>
+      <a href={Portal.Jobs.company_path("Stripe")}><strong>Stripe</strong></a>
+      <a href={Portal.Jobs.company_path("Figma")}><strong>Figma</strong></a>
+      <a href={Portal.Jobs.company_path("GitHub")}><strong>GitHub</strong></a>
+      <a href={Portal.Jobs.company_path("Shopify")}><strong>Shopify</strong></a>
+      <a href={Portal.Jobs.company_path("Vercel")}><strong>Vercel</strong></a>
+    <% end %>
   </section>
 
   <section class="feature-band">

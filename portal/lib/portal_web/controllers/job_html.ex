@@ -81,22 +81,31 @@ defmodule PortalWeb.JobHTML do
 
   def job_card(assigns) do
     ~H"""
-    <a
-      href={if @locked, do: "#unlock", else: ~p"/jobs/#{@job.id}"}
-      class={["job-card", @locked && "locked-card"]}
-    >
+    <article class={["job-card", @locked && "locked-card"]}>
       <.company_avatar job={@job} />
       <div class="job-card-main">
         <div class="job-card-topline">
-          <span>{@job.company || "Company"}</span>
+          <%= if @locked or is_nil_or_empty?(@job.company) do %>
+            <span>{@job.company || "Company"}</span>
+          <% else %>
+            <a href={Portal.Jobs.company_path(@job.company)} class="job-company-link">
+              {@job.company}
+            </a>
+          <% end %>
           <span>{posted_label(@job)}</span>
         </div>
-        <h3>{if @locked, do: "Senior role at a verified tech company", else: @job.title}</h3>
+        <h3>
+          <a href={if @locked, do: "#unlock", else: ~p"/jobs/#{@job.id}"}>
+            {if @locked, do: "Senior role at a verified tech company", else: @job.title}
+          </a>
+        </h3>
         <.metadata_row job={@job} />
         <.tag_list tags={job_tags(@job)} />
       </div>
-      <span class="open-arrow" aria-hidden="true">{if @locked, do: "Unlock", else: "View"}</span>
-    </a>
+      <a href={if @locked, do: "#unlock", else: ~p"/jobs/#{@job.id}"} class="open-arrow">
+        {if @locked, do: "Unlock", else: "View"}
+      </a>
+    </article>
     """
   end
 
