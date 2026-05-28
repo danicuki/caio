@@ -50,6 +50,10 @@ class StandaloneSourceFetchWorker
       query = params[:query].presence || "software engineer"
       page = Integer(params.fetch(:page, 1))
       Standalone::Sources::GetOnBoard.new.fetch_query(query: query, page: page, max_pages: 1)
+    when "google_careers"
+      Standalone::Sources::GoogleCareers.new.fetch_page(Integer(params.fetch(:page, 1)))
+    when "builtin"
+      Standalone::Sources::BuiltIn.new.fetch_page(Integer(params.fetch(:page, 1)))
     when "greenhouse"
       source = Standalone::Sources::Greenhouse.new
       board = params.fetch(:board)

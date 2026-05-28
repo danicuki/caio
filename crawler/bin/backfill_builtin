@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+
+require_relative "../config/environment"
+require Rails.root.join("lib/standalone/job_api_batch")
+
+pages = Integer(ENV.fetch("BUILTIN_BACKFILL_PAGES", "200"))
+batch_size = Integer(ENV.fetch("BUILTIN_BACKFILL_BATCH_PAGES", "10"))
+sleep_seconds = Float(ENV.fetch("BUILTIN_BACKFILL_SLEEP_SECONDS", "0.5"))
+empty_batch_limit = Integer(ENV.fetch("BUILTIN_BACKFILL_EMPTY_BATCH_LIMIT", "3"))
+database = Standalone::Database.new(
+  ENV["JOB_CRAWLER_DATABASE"].presence ||
+    ActiveRecord::Base.connection_db_config.database ||
+    Rails.root.join("db/development.sqlite3").to_s
+)
+source = Standalone::Sources::BuiltIn.new
+
+total_fetched = 0
+total_imported = 0
+total_inserted = 0
+total_updated = 0
+total_skipped = 0
+empty_batches = 0
+
+(1..pages).each_slice(batch_size) do |page_batch|
+  jobs = page_batch.flat_map { |page| source.fetch_page(page) }.uniq { |job| job[:source_key] }
+  if jobs.empty?
+    empty_batches += 1
+    break if empty_batches >= empty_batch_limit
+
+    next
+  end
+
+  empty_batches = 0
+
+  stats = database.upsert_jobs_with_stats("builtin", jobs)
+  SourceRun.create!(
+    source: "builtin",
+    status: "imported",
+    fetched_count: jobs.size,
+    imported_count: stats.imported_count,
+    inserted_count: stats.inserted_count,
+    updated_count: stats.updated_count,
+    skipped_count: stats.skipped_count,
+    created_at: Time.current
+  )
+
+  total_fetched += jobs.size
+  total_imported += stats.imported_count
+  total_inserted += stats.inserted_count
+  total_updated += stats.updated_count
+  total_skipped += stats.skipped_count
+
+  puts(
+    "pages=#{page_batch.first}-#{page_batch.last} " \
+    "fetched=#{jobs.size} imported=#{stats.imported_count} " \
+    "inserted=#{stats.inserted_count} updated=#{stats.updated_count} skipped=#{stats.skipped_count}"
+  )
+
+  sleep sleep_seconds if sleep_seconds.positive?
+end
+
+puts(
+  "total fetched=#{total_fetched} imported=#{total_imported} " \
+  "inserted=#{total_inserted} updated=#{total_updated} skipped=#{total_skipped}"
+)

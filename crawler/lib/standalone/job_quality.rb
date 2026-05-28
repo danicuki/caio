@@ -10,6 +10,11 @@ module Standalone
 
     TECH_SOURCES = %w[
       arbeitnow himalayas jobicy linkedin remotive remotejobs remoteok web3career
+      builtin
+    ].freeze
+
+    TRUSTED_MARKETPLACE_SOURCES = %w[
+      builtin
     ].freeze
 
     TECH_TITLE_PATTERNS = [
@@ -148,6 +153,7 @@ module Standalone
 
     def filter(source_name, jobs, classifier: nil)
       return jobs if disabled?
+      return jobs if TRUSTED_MARKETPLACE_SOURCES.include?(source_name.to_s)
 
       jobs.select { |job| tech?(job, source_name: source_name, classifier: classifier) }
     end

@@ -23,6 +23,40 @@ module Standalone
 
   class RateLimited < StandardError; end
 
+  ImportStats = Struct.new(
+    :fetched_count,
+    :imported_count,
+    :inserted_count,
+    :updated_count,
+    :skipped_count,
+    keyword_init: true
+  ) do
+    def +(other)
+      other = ImportStats.from(other)
+      ImportStats.new(
+        fetched_count: fetched_count.to_i + other.fetched_count.to_i,
+        imported_count: imported_count.to_i + other.imported_count.to_i,
+        inserted_count: inserted_count.to_i + other.inserted_count.to_i,
+        updated_count: updated_count.to_i + other.updated_count.to_i,
+        skipped_count: skipped_count.to_i + other.skipped_count.to_i
+      )
+    end
+
+    def to_i
+      imported_count.to_i
+    end
+
+    def self.zero
+      new(fetched_count: 0, imported_count: 0, inserted_count: 0, updated_count: 0, skipped_count: 0)
+    end
+
+    def self.from(value)
+      return value if value.is_a?(self)
+
+      new(fetched_count: value.to_i, imported_count: value.to_i, inserted_count: 0, updated_count: value.to_i, skipped_count: 0)
+    end
+  end
+
   class Database
     def initialize(path)
       @path = path
@@ -31,14 +65,23 @@ module Standalone
     end
 
     def upsert_jobs(source_name, jobs)
+      upsert_jobs_with_stats(source_name, jobs).to_i
+    end
+
+    def upsert_jobs_with_stats(source_name, jobs)
       fetched_count = jobs.size
       classifier = JobQuality::AiClassifier.new(@path) if JobQuality::AiClassifier.enabled?
       jobs = JobQuality.filter(source_name, jobs, classifier: classifier)
       rejected_count = fetched_count - jobs.size
       warn "quality gate rejected #{rejected_count}/#{fetched_count} #{source_name} jobs" if rejected_count.positive?
-      return 0 if jobs.empty?
+      return ImportStats.new(fetched_count: fetched_count, imported_count: 0, inserted_count: 0, updated_count: 0, skipped_count: rejected_count) if jobs.empty?
 
-      return upsert_jobs_native(source_name, jobs) if defined?(SQLite3::Database)
+      if defined?(SQLite3::Database)
+        stats = upsert_jobs_native(source_name, jobs)
+        stats.fetched_count = fetched_count
+        stats.skipped_count = stats.skipped_count.to_i + rejected_count
+        return stats
+      end
 
       jobs.each_slice(100) do |batch|
         now = Time.now.utc.iso8601
@@ -117,11 +160,19 @@ module Standalone
         execute(sql)
       end
 
-      jobs.size
+      ImportStats.new(
+        fetched_count: fetched_count,
+        imported_count: jobs.size,
+        inserted_count: 0,
+        updated_count: jobs.size,
+        skipped_count: rejected_count
+      )
     end
 
     def upsert_jobs_native(source_name, jobs)
       now = Time.now.utc.iso8601
+      inserted_count = 0
+      updated_count = 0
       db = SQLite3::Database.new(@path)
       db.busy_timeout = Integer(ENV.fetch("SQLITE_BUSY_TIMEOUT_MS", "15000"))
       db.execute("PRAGMA journal_mode = WAL")
@@ -212,76 +263,97 @@ module Standalone
         WHERE source_url = ?
       SQL
 
-      db.transaction do
-        statement = db.prepare(sql)
-        update_by_url_statement = db.prepare(update_by_url_sql)
-        jobs.each do |job|
-          normalized = Normalizer.normalize(job)
-          source_key = job.fetch(:source_key)
-          source_url = job.fetch(:source_url)
-          tags_json = JSON.generate(job[:tags] || [])
-          raw_json = JSON.generate(job[:raw])
-          company_id = company_slug(job[:company])
+      with_sqlite_busy_retry do
+        transaction_inserted_count = 0
+        transaction_updated_count = 0
 
-          if duplicate_url_for_other_key?(db, source_url, source_name, source_key)
-            update_by_url_statement.execute(
-              job.fetch(:title),
-              job[:company],
-              company_id,
-              job[:location],
-              native_boolean(job[:remote]),
-              job[:employment_type],
-              job[:category],
-              job[:salary],
-              job[:published_at],
-              tags_json,
-              job[:description],
-              raw_json,
-              normalized[:salary_min],
-              normalized[:salary_max],
-              normalized[:salary_currency],
-              normalized[:salary_period],
-              normalized[:location_city],
-              normalized[:location_state],
-              normalized[:location_country],
-              normalized[:location_continent],
-              normalized[:location_scope],
-              now,
-              source_url
-            )
-          else
-            statement.execute(
-              source_name,
-              source_key,
-              job.fetch(:title),
-              job[:company],
-              company_id,
-              job[:location],
-              native_boolean(job[:remote]),
-              job[:employment_type],
-              job[:category],
-              job[:salary],
-              source_url,
-              job[:published_at],
-              tags_json,
-              job[:description],
-              raw_json,
-              normalized[:salary_min],
-              normalized[:salary_max],
-              normalized[:salary_currency],
-              normalized[:salary_period],
-              normalized[:location_city],
-              normalized[:location_state],
-              normalized[:location_country],
-              normalized[:location_continent],
-              normalized[:location_scope],
-              now,
-              now
-            )
+        db.transaction do
+          statement = db.prepare(sql)
+          update_by_url_statement = db.prepare(update_by_url_sql)
+          jobs.each do |job|
+            normalized = Normalizer.normalize(job)
+            source_key = job.fetch(:source_key)
+            source_url = job.fetch(:source_url)
+            tags_json = JSON.generate(job[:tags] || [])
+            raw_json = JSON.generate(job[:raw])
+            company_id = company_slug(job[:company])
+
+            if duplicate_url_for_other_key?(db, source_url, source_name, source_key)
+              transaction_updated_count += 1
+              update_by_url_statement.execute(
+                job.fetch(:title),
+                job[:company],
+                company_id,
+                job[:location],
+                native_boolean(job[:remote]),
+                job[:employment_type],
+                job[:category],
+                job[:salary],
+                job[:published_at],
+                tags_json,
+                job[:description],
+                raw_json,
+                normalized[:salary_min],
+                normalized[:salary_max],
+                normalized[:salary_currency],
+                normalized[:salary_period],
+                normalized[:location_city],
+                normalized[:location_state],
+                normalized[:location_country],
+                normalized[:location_continent],
+                normalized[:location_scope],
+                now,
+                source_url
+              )
+            else
+              if existing_job?(db, source_name, source_key, source_url)
+                transaction_updated_count += 1
+              else
+                transaction_inserted_count += 1
+              end
+
+              statement.execute(
+                source_name,
+                source_key,
+                job.fetch(:title),
+                job[:company],
+                company_id,
+                job[:location],
+                native_boolean(job[:remote]),
+                job[:employment_type],
+                job[:category],
+                job[:salary],
+                source_url,
+                job[:published_at],
+                tags_json,
+                job[:description],
+                raw_json,
+                normalized[:salary_min],
+                normalized[:salary_max],
+                normalized[:salary_currency],
+                normalized[:salary_period],
+                normalized[:location_city],
+                normalized[:location_state],
+                normalized[:location_country],
+                normalized[:location_continent],
+                normalized[:location_scope],
+                now,
+                now
+              )
+            end
           end
         end
+
+        inserted_count = transaction_inserted_count
+        updated_count = transaction_updated_count
       end
-      jobs.size
+      ImportStats.new(
+        fetched_count: jobs.size,
+        imported_count: jobs.size,
+        inserted_count: inserted_count,
+        updated_count: updated_count,
+        skipped_count: 0
+      )
     ensure
       begin
         statement&.close
@@ -295,8 +367,8 @@ module Standalone
     def record_run(source_name, fetched_count, imported_count, status: "succeeded", error_message: nil)
       now = Time.now.utc.iso8601
       execute(<<~SQL)
-        INSERT INTO source_runs (source, fetched_count, imported_count, status, error_message, created_at)
-        VALUES (#{quote(source_name)}, #{fetched_count.to_i}, #{imported_count.to_i}, #{quote(status)}, #{quote(error_message)}, #{quote(now)});
+        INSERT INTO source_runs (source, fetched_count, imported_count, inserted_count, updated_count, skipped_count, status, error_message, created_at)
+        VALUES (#{quote(source_name)}, #{fetched_count.to_i}, #{imported_count.to_i}, 0, #{imported_count.to_i}, 0, #{quote(status)}, #{quote(error_message)}, #{quote(now)});
       SQL
     end
 
@@ -430,6 +502,9 @@ module Standalone
           source TEXT NOT NULL,
           fetched_count INTEGER NOT NULL DEFAULT 0,
           imported_count INTEGER NOT NULL DEFAULT 0,
+          inserted_count INTEGER NOT NULL DEFAULT 0,
+          updated_count INTEGER NOT NULL DEFAULT 0,
+          skipped_count INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
           error_message TEXT,
           created_at TEXT NOT NULL
@@ -467,6 +542,9 @@ module Standalone
       add_column_if_missing("job_posts", "location_country", "TEXT")
       add_column_if_missing("job_posts", "location_continent", "TEXT")
       add_column_if_missing("job_posts", "location_scope", "TEXT")
+      add_column_if_missing("source_runs", "inserted_count", "INTEGER NOT NULL DEFAULT 0")
+      add_column_if_missing("source_runs", "updated_count", "INTEGER NOT NULL DEFAULT 0")
+      add_column_if_missing("source_runs", "skipped_count", "INTEGER NOT NULL DEFAULT 0")
       execute(<<~SQL)
         CREATE INDEX IF NOT EXISTS index_job_posts_company_id_id
           ON job_posts(company_id, id DESC);
@@ -538,6 +616,31 @@ module Standalone
         source_name,
         source_key
       ) == 1
+    end
+
+    def existing_job?(db, source_name, source_key, source_url)
+      db.get_first_value(
+        "SELECT 1 FROM job_posts WHERE (source = ? AND source_key = ?) OR source_url = ? LIMIT 1",
+        source_name,
+        source_key,
+        source_url
+      ) == 1
+    end
+
+    def with_sqlite_busy_retry
+      attempts = Integer(ENV.fetch("SQLITE_BUSY_RETRY_ATTEMPTS", "5"))
+      delay = Float(ENV.fetch("SQLITE_BUSY_RETRY_DELAY_SECONDS", "1.0"))
+      attempt = 0
+
+      begin
+        yield
+      rescue SQLite3::BusyException => e
+        attempt += 1
+        raise if attempt > attempts
+
+        sleep(delay * attempt)
+        retry
+      end
     end
   end
 
@@ -2139,6 +2242,207 @@ module Standalone
       end
     end
 
+    class GoogleCareers < Base
+      BASE_URL = "https://www.google.com/about/careers/applications/jobs/results/".freeze
+
+      def name = "google_careers"
+
+      def fetch
+        pages = Integer(ENV.fetch("GOOGLE_CAREERS_PAGES", "220"))
+        (1..pages).flat_map { |page| fetch_page(page) }.uniq { |job| job[:source_key] }
+      end
+
+      def fetch_page(page)
+        url = "#{BASE_URL}?page=#{page}"
+        html = get_html(url)
+        doc = Nokogiri::HTML(html)
+
+        doc.css("a[href*='jobs/results/']").filter_map do |link|
+          normalize_card(link)
+        end.uniq { |job| job[:source_key] }
+      rescue StandardError => e
+        warn "google careers page failed page=#{page.inspect}: #{e.class}: #{e.message}"
+        []
+      end
+
+      private
+
+      def normalize_card(link)
+        href = link["href"].to_s
+        id = href[%r{jobs/results/(\d+)}, 1]
+        return nil unless id
+
+        card = link.ancestors.find { |node| node["class"].to_s.split.include?("sMn82b") } ||
+          link.ancestors.find { |node| node.css("h3").any? && node.css("a[href*='jobs/results/']").size == 1 }
+        return nil unless card
+
+        title = card.at_css("h3")&.text.to_s.gsub(/\s+/, " ").strip
+        return nil if title.empty?
+
+        canonical = google_url(href)
+        locations = card.css("span.r0wTof").map { |span| span.text.gsub(/\A\s*;\s*/, "").gsub(/\s+/, " ").strip }.reject(&:empty?).uniq
+        location = locations.join("; ")
+        level = card.at_css("h2")&.text.to_s.gsub(/\s+/, " ").strip
+        description = description_html(card)
+
+        {
+          source_key: id,
+          title: title,
+          company: "Google",
+          location: location.empty? ? nil : location,
+          remote: card.text.match?(/remote eligible/i) ? true : nil,
+          employment_type: nil,
+          category: nil,
+          salary: nil,
+          source_url: canonical,
+          published_at: nil,
+          tags: [level].reject(&:empty?),
+          description: description,
+          raw: { "google_job_id" => id, "page" => href[/[?&]page=(\d+)/, 1] }
+        }
+      end
+
+      def description_html(card)
+        sections = card.css(".Xsxa1e")
+        html = sections.map(&:inner_html).join("\n").strip
+        return html unless html.empty?
+
+        items = card.css("li").map { |li| "<li>#{escape_html(li.text.gsub(/\s+/, " ").strip)}</li>" }.join
+        items.empty? ? nil : "<h4>Minimum qualifications</h4><ul>#{items}</ul>"
+      end
+
+      def get_html(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125 Safari/537.36"
+          request["Accept"] = "text/html,application/xhtml+xml"
+          request["Accept-Language"] = "en-US,en;q=0.9"
+          http.request(request)
+        end
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body.to_s
+      end
+
+      def escape_html(value)
+        CGI.escapeHTML(value.to_s)
+      end
+
+      def google_url(href)
+        href = href.to_s.sub(/\?.*\z/, "")
+        if href.start_with?("http")
+          href
+        else
+          URI.join("https://www.google.com/about/careers/applications/", href).to_s
+        end
+      end
+    end
+
+    class BuiltIn < Base
+      BASE_URL = "https://builtin.com/jobs".freeze
+
+      def name = "builtin"
+
+      def fetch
+        pages = Integer(ENV.fetch("BUILTIN_PAGES", "20"))
+        (1..pages).flat_map { |page| fetch_page(page) }.uniq { |job| job[:source_key] }
+      end
+
+      def fetch_page(page)
+        url = page.to_i <= 1 ? BASE_URL : "#{BASE_URL}?page=#{page}"
+        html = get_html(url)
+        doc = Nokogiri::HTML(html)
+
+        doc.css("a[href*='/job/']").filter_map do |link|
+          normalize_card(link, url)
+        end.uniq { |job| job[:source_key] }
+      rescue StandardError => e
+        warn "builtin page failed page=#{page.inspect}: #{e.class}: #{e.message}"
+        []
+      end
+
+      private
+
+      def normalize_card(link, base_url)
+        href = link["href"].to_s
+        return nil unless href.match?(%r{/job/})
+
+        title = link.text.gsub(/\s+/, " ").strip
+        return nil if title.empty? || title.length < 4
+
+        canonical = URI.join(base_url, href).to_s.sub(/\?.*\z/, "")
+        card = link.ancestors.find { |node| node["class"].to_s.include?("job-bounded-responsive") } ||
+          link.ancestors.find { |node| node.css("a[href*='/job/']").size == 1 && node.text.include?(title) } ||
+          link.parent
+        company = company_name(card, link)
+        body = card&.text.to_s.gsub(/\s+/, " ").strip
+
+        {
+          source_key: canonical[%r{/job/[^/]+/(\d+)}, 1] || Digest::SHA256.hexdigest(canonical),
+          title: title,
+          company: company,
+          location: location_text(body, card),
+          remote: body.match?(/remote/i) ? true : nil,
+          employment_type: nil,
+          category: nil,
+          salary: salary_text(body),
+          source_url: canonical,
+          published_at: nil,
+          tags: tags(body),
+          description: body.empty? ? nil : "<p>#{CGI.escapeHTML(body)}</p>",
+          raw: { "builtin_url" => canonical }
+        }
+      end
+
+      def company_name(card, job_link)
+        company_link = card&.css("a[href^='/company/']")&.find { |link| !link.text.to_s.strip.empty? }
+        company_text = company_link&.text.to_s.gsub(/\s+/, " ").strip
+        return company_text unless company_text.empty?
+
+        links = card&.css("a") || []
+        value = links.find { |link| link != job_link && !link["href"].to_s.match?(%r{/job/}) }&.text.to_s
+        value = value.gsub(/\s+/, " ").strip
+        value.empty? ? nil : value
+      end
+
+      def location_text(body, card = nil)
+        value = card&.css("span.font-barlow.text-gray-04")&.map { |span| span.text.gsub(/\s+/, " ").strip }&.find do |text|
+          text.match?(/\b[A-Z][A-Za-z .'-]+,\s*[A-Z]{2},\s*USA\b/) ||
+            text.match?(/\b(Remote|United States|India|Canada|United Kingdom|Brazil|Portugal|Germany|France|Netherlands|Singapore|Australia)\b/i)
+        end
+        return value if value && !value.match?(/\A(Remote|Hybrid|In-Office|In office|Onsite)\z/i)
+
+        return "Remote" if body.match?(/\bRemote\b/i)
+
+        body[/\b[A-Z][A-Za-z .'-]+,\s*[A-Z]{2},\s*USA\b/] ||
+          body[/\b[A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+\b/]
+      end
+
+      def salary_text(body)
+        body[/\b\d{2,3}K\s*-\s*\d{2,3}K\s+(?:Annually|Hourly|Monthly)\b/i]
+      end
+
+      def tags(body)
+        body.scan(/\b(?:Senior|Mid|Junior|Entry|Expert\/Leader) level\b/i).uniq
+      end
+
+      def get_html(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = USER_AGENT
+          request["Accept"] = "text/html,application/xhtml+xml"
+          http.request(request)
+        end
+
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body.to_s
+      end
+    end
+
     class BrowserJobPosting < Base
       DEFAULT_SEEDS = [
         "https://jobs.ashbyhq.com/openai",
@@ -2746,6 +3050,8 @@ module Standalone
       Sources::Jobicy,
       Sources::GetOnBoard,
       Sources::Web3Career,
+      Sources::GoogleCareers,
+      Sources::BuiltIn,
       Sources::Greenhouse,
       Sources::Lever,
       Sources::Ashby,

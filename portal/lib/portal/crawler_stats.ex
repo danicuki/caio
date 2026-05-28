@@ -4,8 +4,23 @@ defmodule Portal.CrawlerStats do
   alias Portal.Repo
 
   @query_opts [timeout: 30_000]
+  @cache_table :portal_crawler_stats_cache
+  @cache_key :snapshot
+  @cache_ttl_ms 60_000
 
   def snapshot do
+    case cached_snapshot() do
+      {:ok, snapshot} ->
+        snapshot
+
+      :miss ->
+        snapshot = build_snapshot()
+        put_cached_snapshot(snapshot)
+        snapshot
+    end
+  end
+
+  def build_snapshot do
     cutoffs = cutoffs()
 
     %{
@@ -14,8 +29,7 @@ defmodule Portal.CrawlerStats do
       daily: daily(cutoffs),
       sources: sources(cutoffs),
       states: source_states(),
-      recent_errors: recent_errors(),
-      recent_runs: recent_runs()
+      recent_errors: recent_errors()
     }
   end
 
@@ -23,13 +37,21 @@ defmodule Portal.CrawlerStats do
     job_stats =
       one(
         """
+        SELECT count(*) AS total_jobs, max(created_at) AS latest_job_at
+        FROM job_posts
+        """,
+        []
+      )
+
+    recent_job_stats =
+      one(
+        """
         SELECT
-          count(*) AS total_jobs,
-          max(created_at) AS latest_job_at,
           SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS jobs_last_hour,
           SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS jobs_last_day,
-          SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS jobs_last_week
+          count(*) AS jobs_last_week
         FROM job_posts
+        WHERE created_at >= ?
         """,
         [cutoffs.job_hour, cutoffs.job_day, cutoffs.job_week]
       )
@@ -38,25 +60,35 @@ defmodule Portal.CrawlerStats do
       one(
         """
         SELECT
-          count(*) AS runs_total,
-          max(created_at) AS latest_run_at,
           SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS runs_last_hour,
-          SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS runs_last_day,
-          SUM(CASE WHEN created_at >= ? THEN fetched_count ELSE 0 END) AS fetched_last_day,
-          SUM(CASE WHEN created_at >= ? THEN imported_count ELSE 0 END) AS imported_last_day,
-          SUM(CASE WHEN status != 'imported' AND created_at >= ? THEN 1 ELSE 0 END) AS errors_last_day
+          count(*) AS runs_last_day,
+          SUM(fetched_count) AS fetched_last_day,
+          SUM(imported_count) AS imported_last_day,
+          SUM(inserted_count) AS inserted_last_day,
+          SUM(updated_count) AS updated_last_day,
+          SUM(skipped_count) AS skipped_last_day,
+          SUM(CASE WHEN status != 'imported' THEN 1 ELSE 0 END) AS errors_last_day
         FROM source_runs
+        WHERE created_at >= ?
         """,
-        [
-          cutoffs.source_hour,
-          cutoffs.source_day,
-          cutoffs.source_day,
-          cutoffs.source_day,
-          cutoffs.source_day
-        ]
+        [cutoffs.source_hour, cutoffs.source_day]
       )
 
-    Map.merge(job_stats, run_stats)
+    latest_run =
+      one(
+        """
+        SELECT created_at AS latest_run_at
+        FROM source_runs
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        []
+      )
+
+    job_stats
+    |> Map.merge(recent_job_stats)
+    |> Map.merge(run_stats)
+    |> Map.merge(latest_run)
   end
 
   defp hourly(cutoffs) do
@@ -76,6 +108,9 @@ defmodule Portal.CrawlerStats do
           count(*) AS runs,
           SUM(fetched_count) AS fetched,
           SUM(imported_count) AS imported,
+          SUM(inserted_count) AS inserted,
+          SUM(updated_count) AS updated,
+          SUM(skipped_count) AS skipped,
           SUM(CASE WHEN status != 'imported' THEN 1 ELSE 0 END) AS errors
         FROM source_runs
         WHERE created_at >= ?
@@ -87,6 +122,9 @@ defmodule Portal.CrawlerStats do
         COALESCE(run_hours.runs, 0) AS runs,
         COALESCE(run_hours.fetched, 0) AS fetched,
         COALESCE(run_hours.imported, 0) AS imported,
+        COALESCE(run_hours.inserted, 0) AS inserted,
+        COALESCE(run_hours.updated, 0) AS updated,
+        COALESCE(run_hours.skipped, 0) AS skipped,
         COALESCE(run_hours.errors, 0) AS errors
       FROM job_hours
       FULL OUTER JOIN run_hours ON run_hours.bucket = job_hours.bucket
@@ -102,38 +140,16 @@ defmodule Portal.CrawlerStats do
   defp daily(cutoffs) do
     rows(
       """
-      WITH job_days AS (
-        SELECT
-          date(datetime(created_at)) AS bucket,
-          count(*) AS new_jobs
-        FROM job_posts
-        WHERE created_at >= ?
-        GROUP BY bucket
-      ),
-      run_days AS (
-        SELECT
-          date(datetime(replace(created_at, ' UTC', ''))) AS bucket,
-          count(*) AS runs,
-          SUM(fetched_count) AS fetched,
-          SUM(imported_count) AS imported,
-          SUM(CASE WHEN status != 'imported' THEN 1 ELSE 0 END) AS errors
-        FROM source_runs
-        WHERE created_at >= ?
-        GROUP BY bucket
-      )
       SELECT
-        job_days.bucket AS bucket,
-        COALESCE(job_days.new_jobs, 0) AS new_jobs,
-        COALESCE(run_days.runs, 0) AS runs,
-        COALESCE(run_days.fetched, 0) AS fetched,
-        COALESCE(run_days.imported, 0) AS imported,
-        COALESCE(run_days.errors, 0) AS errors
-      FROM job_days
-      LEFT JOIN run_days ON run_days.bucket = job_days.bucket
-      ORDER BY job_days.bucket DESC
+        date(datetime(created_at)) AS bucket,
+        count(*) AS new_jobs
+      FROM job_posts
+      WHERE created_at >= ?
+      GROUP BY bucket
+      ORDER BY bucket DESC
       LIMIT 14
       """,
-      [cutoffs.job_14_days, cutoffs.source_14_days]
+      [cutoffs.job_14_days]
     )
   end
 
@@ -152,28 +168,34 @@ defmodule Portal.CrawlerStats do
           count(*) AS runs_24h,
           SUM(fetched_count) AS fetched_24h,
           SUM(imported_count) AS imported_24h,
+          SUM(inserted_count) AS inserted_24h,
+          SUM(updated_count) AS updated_24h,
+          SUM(skipped_count) AS skipped_24h,
           SUM(CASE WHEN status != 'imported' THEN 1 ELSE 0 END) AS errors_24h,
           max(created_at) AS last_run_at
         FROM source_runs
         WHERE created_at >= ?
         GROUP BY source
       ),
-      source_runs_all AS (
-        SELECT source, max(created_at) AS last_seen_at
-        FROM source_runs
-        GROUP BY source
+      active_sources AS (
+        SELECT source FROM source_jobs
+        UNION
+        SELECT source FROM source_runs_24h
       )
       SELECT
-        COALESCE(source_runs_24h.source, source_jobs.source, source_runs_all.source) AS source,
+        active_sources.source AS source,
         COALESCE(source_jobs.new_jobs_24h, 0) AS new_jobs_24h,
         COALESCE(source_runs_24h.runs_24h, 0) AS runs_24h,
         COALESCE(source_runs_24h.fetched_24h, 0) AS fetched_24h,
         COALESCE(source_runs_24h.imported_24h, 0) AS imported_24h,
+        COALESCE(source_runs_24h.inserted_24h, 0) AS inserted_24h,
+        COALESCE(source_runs_24h.updated_24h, 0) AS updated_24h,
+        COALESCE(source_runs_24h.skipped_24h, 0) AS skipped_24h,
         COALESCE(source_runs_24h.errors_24h, 0) AS errors_24h,
-        COALESCE(source_runs_24h.last_run_at, source_runs_all.last_seen_at) AS last_run_at
-      FROM source_runs_all
-      LEFT JOIN source_runs_24h ON source_runs_24h.source = source_runs_all.source
-      LEFT JOIN source_jobs ON source_jobs.source = source_runs_all.source
+        source_runs_24h.last_run_at AS last_run_at
+      FROM active_sources
+      LEFT JOIN source_runs_24h ON source_runs_24h.source = active_sources.source
+      LEFT JOIN source_jobs ON source_jobs.source = active_sources.source
       ORDER BY new_jobs_24h DESC, imported_24h DESC, runs_24h DESC
       LIMIT 40
       """,
@@ -192,18 +214,9 @@ defmodule Portal.CrawlerStats do
 
   defp recent_errors do
     rows("""
-    SELECT source, status, fetched_count, imported_count, error_message, created_at
+    SELECT source, status, fetched_count, imported_count, inserted_count, updated_count, skipped_count, error_message, created_at
     FROM source_runs
     WHERE status != 'imported' OR error_message IS NOT NULL
-    ORDER BY id DESC
-    LIMIT 25
-    """)
-  end
-
-  defp recent_runs do
-    rows("""
-    SELECT source, status, fetched_count, imported_count, error_message, created_at
-    FROM source_runs
     ORDER BY id DESC
     LIMIT 25
     """)
@@ -218,6 +231,9 @@ defmodule Portal.CrawlerStats do
         0 AS runs,
         0 AS fetched,
         0 AS imported,
+        0 AS inserted,
+        0 AS updated,
+        0 AS skipped,
         0 AS errors
       FROM job_posts
       WHERE created_at >= ?
@@ -236,8 +252,7 @@ defmodule Portal.CrawlerStats do
       job_week: iso_cutoff(days: 7),
       job_14_days: iso_cutoff(days: 14),
       source_hour: text_cutoff(hours: 1),
-      source_day: text_cutoff(hours: 24),
-      source_14_days: text_cutoff(days: 14)
+      source_day: text_cutoff(hours: 24)
     }
   end
 
@@ -273,5 +288,31 @@ defmodule Portal.CrawlerStats do
       |> Enum.zip(row)
       |> Map.new()
     end)
+  end
+
+  defp cached_snapshot do
+    ensure_cache_table()
+    now = System.monotonic_time(:millisecond)
+
+    case :ets.lookup(@cache_table, @cache_key) do
+      [{@cache_key, timestamp, snapshot}] when now - timestamp < @cache_ttl_ms -> {:ok, snapshot}
+      _ -> :miss
+    end
+  end
+
+  defp put_cached_snapshot(snapshot) do
+    ensure_cache_table()
+    :ets.insert(@cache_table, {@cache_key, System.monotonic_time(:millisecond), snapshot})
+  end
+
+  defp ensure_cache_table do
+    :ets.new(@cache_table, [
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
+  rescue
+    ArgumentError -> :ok
   end
 end

@@ -13,14 +13,17 @@ class JobPostImportWorker
 
   def perform(source, jobs_payload)
     jobs = JobBatchSpool.read(jobs_payload)
-    imported = database.upsert_jobs(source, jobs)
+    stats = import_jobs(source, jobs)
     JobBatchSpool.delete(jobs_payload)
 
     SourceRun.create!(
       source: source,
       status: "imported",
       fetched_count: jobs.size,
-      imported_count: imported,
+      imported_count: stats.imported_count,
+      inserted_count: stats.inserted_count,
+      updated_count: stats.updated_count,
+      skipped_count: stats.skipped_count,
       created_at: Time.current
     )
   rescue StandardError => e
@@ -29,6 +32,9 @@ class JobPostImportWorker
       status: "import_failed",
       fetched_count: 0,
       imported_count: 0,
+      inserted_count: 0,
+      updated_count: 0,
+      skipped_count: 0,
       error_message: "#{e.class}: #{e.message}",
       created_at: Time.current
     )
@@ -39,6 +45,14 @@ class JobPostImportWorker
 
   def database
     @database ||= Standalone::Database.new(database_path)
+  end
+
+  def import_jobs(source, jobs)
+    if database.respond_to?(:upsert_jobs_with_stats)
+      database.upsert_jobs_with_stats(source, jobs)
+    else
+      Standalone::ImportStats.from(database.upsert_jobs(source, jobs))
+    end
   end
 
   def database_path

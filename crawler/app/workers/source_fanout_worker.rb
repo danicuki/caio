@@ -60,82 +60,111 @@ class SourceFanoutWorker
 
   def enqueue_static_sources
     %w[remotive remoteok].each do |source|
-      StandaloneSourceFetchWorker.perform_async(source, {})
+      enqueue_source(source, {})
     end
   end
 
   def enqueue_jobicy
-    StandaloneSourceFetchWorker.perform_async("jobicy", {})
+    return unless source_yield_allowed?("jobicy")
+
+    enqueue_source("jobicy", {})
 
     (Standalone::Sources::Jobicy::INDUSTRIES + Standalone::Sources::Jobicy::TAGS).uniq.each do |value|
       key = Standalone::Sources::Jobicy::INDUSTRIES.include?(value) ? "industry" : "tag"
-      StandaloneSourceFetchWorker.perform_async("jobicy", { key => value })
+      enqueue_source("jobicy", { key => value })
     end
   end
 
   def enqueue_web3career
-    StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api" })
+    return unless source_yield_allowed?("web3career")
+
+    enqueue_source("web3career", { "mode" => "api" })
 
     Standalone::Sources::Web3Career::TAGS.each do |tag|
-      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api", "tag" => tag })
+      enqueue_source("web3career", { "mode" => "api", "tag" => tag })
     end
 
     Standalone::Sources::Web3Career::COUNTRIES.each do |country|
-      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "api", "country" => country })
+      enqueue_source("web3career", { "mode" => "api", "country" => country })
     end
 
     Integer(ENV.fetch("WEB3CAREER_SOURCE_PAGES", "5000")).times do |index|
-      StandaloneSourceFetchWorker.perform_async("web3career", { "mode" => "html", "page" => index + 1 })
+      enqueue_source("web3career", { "mode" => "html", "page" => index + 1 })
     end
   end
 
   def enqueue_public_marketplaces
-    himalayas_search_queries.each do |query|
-      himalayas_search_countries.each do |country|
-        Integer(ENV.fetch("HIMALAYAS_SEARCH_SOURCE_PAGES", "10")).times do |index|
-          StandaloneSourceFetchWorker.perform_async("himalayas_search", { "query" => query, "country" => country, "offset" => index * 20 })
+    if source_yield_allowed?("himalayas_search")
+      himalayas_search_queries.each do |query|
+        himalayas_search_countries.each do |country|
+          Integer(ENV.fetch("HIMALAYAS_SEARCH_SOURCE_PAGES", "10")).times do |index|
+            enqueue_source("himalayas_search", { "query" => query, "country" => country, "offset" => index * 20 })
+          end
         end
       end
     end
 
-    getonbrd_queries.each do |query|
-      Integer(ENV.fetch("GETONBRD_SOURCE_PAGES", "2")).times do |index|
-        StandaloneSourceFetchWorker.perform_async("getonbrd", { "query" => query, "page" => index + 1 })
+    if source_yield_allowed?("getonbrd")
+      getonbrd_queries.each do |query|
+        Integer(ENV.fetch("GETONBRD_SOURCE_PAGES", "2")).times do |index|
+          enqueue_source("getonbrd", { "query" => query, "page" => index + 1 })
+        end
       end
     end
+
+    if source_yield_allowed?("builtin")
+      Integer(ENV.fetch("BUILTIN_SOURCE_PAGES", "50")).times do |index|
+        enqueue_source("builtin", { "page" => index + 1 })
+      end
+    end
+
   end
 
   def enqueue_company_boards
-    greenhouse_boards.each do |board|
-      StandaloneSourceFetchWorker.perform_async("greenhouse", { "board" => board })
+    if source_yield_allowed?("greenhouse")
+      greenhouse_boards.each do |board|
+        enqueue_source("greenhouse", { "board" => board })
+      end
     end
 
-    lever_companies.each do |company|
-      StandaloneSourceFetchWorker.perform_async("lever", { "company" => company })
+    if source_yield_allowed?("lever")
+      lever_companies.each do |company|
+        enqueue_source("lever", { "company" => company })
+      end
     end
 
-    ashby_orgs.each do |org|
-      StandaloneSourceFetchWorker.perform_async("ashby", { "org" => org })
+    if source_yield_allowed?("ashby")
+      ashby_orgs.each do |org|
+        enqueue_source("ashby", { "org" => org })
+      end
     end
   end
 
   def enqueue_new_ats_sources
-    smartrecruiters_companies.each do |company|
-      Integer(ENV.fetch("SMARTRECRUITERS_SOURCE_PAGES", "60")).times do |index|
-        StandaloneSourceFetchWorker.perform_async("smartrecruiters", { "company" => company, "offset" => index * 100 })
+    if source_yield_allowed?("smartrecruiters")
+      smartrecruiters_companies.each do |company|
+        Integer(ENV.fetch("SMARTRECRUITERS_SOURCE_PAGES", "60")).times do |index|
+          enqueue_source("smartrecruiters", { "company" => company, "offset" => index * 100 })
+        end
       end
     end
 
-    recruitee_companies.each do |company|
-      StandaloneSourceFetchWorker.perform_async("recruitee", { "company" => company })
+    if source_yield_allowed?("recruitee")
+      recruitee_companies.each do |company|
+        enqueue_source("recruitee", { "company" => company })
+      end
     end
 
-    workable_accounts.each do |account|
-      StandaloneSourceFetchWorker.perform_async("workable", { "account" => account })
+    if source_yield_allowed?("workable")
+      workable_accounts.each do |account|
+        enqueue_source("workable", { "account" => account })
+      end
     end
   end
 
   def enqueue_company_name_ats_probes
+    return unless ENV.fetch("ATS_PROBE_ENABLED", "false") == "true"
+
     candidates = company_name_candidates
     return if candidates.empty?
 
@@ -156,22 +185,30 @@ class SourceFanoutWorker
   end
 
   def enqueue_paged_sources
-    Integer(ENV.fetch("ARBEITNOW_SOURCE_PAGES", "250")).times do |index|
-      StandaloneSourceFetchWorker.perform_async("arbeitnow", { "page" => index + 1 })
-    end
-
-    Standalone::Sources::TheMuse::CATEGORIES.each do |category|
-      Integer(ENV.fetch("THEMUSE_SOURCE_PAGES_PER_CATEGORY", "100")).times do |index|
-        StandaloneSourceFetchWorker.perform_async("themuse", { "category" => category, "page" => index + 1 })
+    if source_yield_allowed?("arbeitnow")
+      Integer(ENV.fetch("ARBEITNOW_SOURCE_PAGES", "250")).times do |index|
+        enqueue_source("arbeitnow", { "page" => index + 1 })
       end
     end
 
-    Integer(ENV.fetch("REMOTEJOBS_SOURCE_PAGES", "300")).times do |index|
-      StandaloneSourceFetchWorker.perform_async("remotejobs", { "offset" => index * 50 })
+    if source_yield_allowed?("themuse")
+      Standalone::Sources::TheMuse::CATEGORIES.each do |category|
+        Integer(ENV.fetch("THEMUSE_SOURCE_PAGES_PER_CATEGORY", "100")).times do |index|
+          enqueue_source("themuse", { "category" => category, "page" => index + 1 })
+        end
+      end
     end
 
-    Integer(ENV.fetch("HIMALAYAS_SOURCE_PAGES", "500")).times do |index|
-      StandaloneSourceFetchWorker.perform_async("himalayas", { "offset" => index * 20 })
+    if source_yield_allowed?("remotejobs")
+      Integer(ENV.fetch("REMOTEJOBS_SOURCE_PAGES", "300")).times do |index|
+        enqueue_source("remotejobs", { "offset" => index * 50 })
+      end
+    end
+
+    if source_yield_allowed?("himalayas")
+      Integer(ENV.fetch("HIMALAYAS_SOURCE_PAGES", "500")).times do |index|
+        enqueue_source("himalayas", { "offset" => index * 20 })
+      end
     end
   end
 
@@ -180,13 +217,45 @@ class SourceFanoutWorker
     compact = candidate.fetch(:compact)
     camel = candidate.fetch(:camel)
 
-    StandaloneSourceFetchWorker.perform_async("greenhouse", { "board" => slug })
-    StandaloneSourceFetchWorker.perform_async("lever", { "company" => slug })
-    StandaloneSourceFetchWorker.perform_async("ashby", { "org" => slug })
-    StandaloneSourceFetchWorker.perform_async("recruitee", { "company" => slug })
-    StandaloneSourceFetchWorker.perform_async("workable", { "account" => slug })
-    StandaloneSourceFetchWorker.perform_async("smartrecruiters", { "company" => compact, "offset" => 0 })
-    StandaloneSourceFetchWorker.perform_async("smartrecruiters", { "company" => camel, "offset" => 0 }) if camel != compact
+    enqueue_source("greenhouse", { "board" => slug })
+    enqueue_source("lever", { "company" => slug })
+    enqueue_source("ashby", { "org" => slug })
+    enqueue_source("recruitee", { "company" => slug })
+    enqueue_source("workable", { "account" => slug })
+    enqueue_source("smartrecruiters", { "company" => compact, "offset" => 0 })
+    enqueue_source("smartrecruiters", { "company" => camel, "offset" => 0 }) if camel != compact
+  end
+
+  def enqueue_source(source, params)
+    StandaloneSourceFetchWorker.perform_async(source, params)
+  end
+
+  def source_yield_allowed?(source)
+    return true unless ENV.fetch("CRAWLER_YIELD_GATE_ENABLED", "true") == "true"
+
+    @source_yield_allowed ||= {}
+    return @source_yield_allowed[source] if @source_yield_allowed.key?(source)
+
+    lookback_hours = Integer(ENV.fetch("CRAWLER_YIELD_LOOKBACK_HOURS", "6"))
+    min_imported = Integer(ENV.fetch("CRAWLER_YIELD_MIN_IMPORTED", "10000"))
+    min_new_per_1k = Float(ENV.fetch("CRAWLER_YIELD_MIN_NEW_PER_1K", "1.0"))
+    cutoff = lookback_hours.hours.ago
+    runs = SourceRun.where(source: source).where("created_at >= ?", cutoff)
+    imported = runs.sum(:imported_count).to_i
+
+    allowed = if imported < min_imported
+      true
+    else
+      inserted = if SourceRun.column_names.include?("inserted_count")
+        runs.sum(:inserted_count).to_i
+      else
+        JobPost.where(source: source).where("created_at >= ?", cutoff).count
+      end
+      inserted * 1000.0 / imported >= min_new_per_1k
+    end
+
+    warn "yield gate skipped source=#{source} imported=#{imported} lookback_hours=#{lookback_hours}" unless allowed
+    @source_yield_allowed[source] = allowed
   end
 
   def company_name_candidates

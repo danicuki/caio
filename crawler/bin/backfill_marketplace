@@ -1,0 +1,93 @@
+#!/usr/bin/env ruby
+
+def load_env_file(path)
+  return unless File.file?(path)
+
+  ENV["CAIO_LOADED_ENV_FILES"] = [ENV["CAIO_LOADED_ENV_FILES"], path].compact.reject(&:empty?).join(",")
+
+  File.readlines(path).each do |line|
+    line = line.strip
+    next if line.empty? || line.start_with?("#") || !line.include?("=")
+
+    key, value = line.split("=", 2)
+    key = key.strip
+    next if key.empty? || ENV.key?(key)
+
+    value = value.to_s.strip
+    value = value[1...-1] if value.length >= 2 && %w[' "].include?(value[0]) && value[-1] == value[0]
+
+    ENV[key] = value
+  end
+end
+
+load_env_file(File.expand_path("../../.env", __dir__))
+load_env_file(File.expand_path("../.env", __dir__))
+
+require_relative "../config/environment"
+require Rails.root.join("lib/standalone/job_api_batch")
+
+source_name = ENV.fetch("MARKETPLACE_SOURCE", ARGV[0] || "builtin")
+batch_size = Integer(ENV.fetch("MARKETPLACE_BACKFILL_BATCH_SIZE", "10"))
+sleep_seconds = Float(ENV.fetch("MARKETPLACE_BACKFILL_SLEEP_SECONDS", "0.5"))
+empty_batch_limit = Integer(ENV.fetch("MARKETPLACE_BACKFILL_EMPTY_BATCH_LIMIT", "3"))
+
+source =
+  case source_name
+  when "builtin" then Standalone::Sources::BuiltIn.new
+  else
+    abort "unknown MARKETPLACE_SOURCE=#{source_name.inspect}; expected builtin"
+  end
+
+pages = Integer(ENV.fetch("BUILTIN_BACKFILL_PAGES", "50"))
+targets = (1..pages).to_a
+
+database = Standalone::Database.new(
+  ENV["JOB_CRAWLER_DATABASE"].presence ||
+    ActiveRecord::Base.connection_db_config.database ||
+    Rails.root.join("db/development.sqlite3").to_s
+)
+
+totals = Hash.new(0)
+empty_batches = 0
+
+targets.each_slice(batch_size) do |batch|
+  jobs = batch.flat_map { |target| source.fetch_page(target) }.uniq { |job| job[:source_key] }
+  if jobs.empty?
+    empty_batches += 1
+    break if empty_batches >= empty_batch_limit
+
+    next
+  end
+
+  empty_batches = 0
+  stats = database.upsert_jobs_with_stats(source_name, jobs)
+  SourceRun.create!(
+    source: source_name,
+    status: "imported",
+    fetched_count: jobs.size,
+    imported_count: stats.imported_count,
+    inserted_count: stats.inserted_count,
+    updated_count: stats.updated_count,
+    skipped_count: stats.skipped_count,
+    created_at: Time.current
+  )
+
+  totals[:fetched] += jobs.size
+  totals[:imported] += stats.imported_count
+  totals[:inserted] += stats.inserted_count
+  totals[:updated] += stats.updated_count
+  totals[:skipped] += stats.skipped_count
+
+  puts(
+    "source=#{source_name} targets=#{batch.first}-#{batch.last} " \
+    "fetched=#{jobs.size} imported=#{stats.imported_count} " \
+    "inserted=#{stats.inserted_count} updated=#{stats.updated_count} skipped=#{stats.skipped_count}"
+  )
+
+  sleep sleep_seconds if sleep_seconds.positive?
+end
+
+puts(
+  "source=#{source_name} total fetched=#{totals[:fetched]} imported=#{totals[:imported]} " \
+  "inserted=#{totals[:inserted]} updated=#{totals[:updated]} skipped=#{totals[:skipped]}"
+)
