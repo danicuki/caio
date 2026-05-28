@@ -17,6 +17,11 @@
     <meta name="twitter:title" content={PortalWeb.PageHTML.meta_title(assigns)} />
     <meta name="twitter:description" content={PortalWeb.PageHTML.meta_description(assigns)} />
     <meta name="twitter:image" content={PortalWeb.PageHTML.og_image_url(assigns)} />
+    <%= if json_ld = assigns[:json_ld] do %>
+      <script type="application/ld+json">
+        <%= raw(Jason.encode!(json_ld)) %>
+      </script>
+    <% end %>
     <.live_title default="Caio" suffix=" · Caio" phx-no-format>{assigns[:page_title]}</.live_title>
     <link rel="icon" href={~p"/images/caio-mark.svg"} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={~p"/images/caio-apple-touch.png"} />

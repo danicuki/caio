@@ -44,7 +44,6 @@ defmodule PortalWeb.JobHTML do
       <div id="site-nav-menu" class="nav-menu">
         <div class="nav-links">
           <a href={~p"/jobs"} class={["nav-link", @active == "jobs" && "active"]}>Jobs</a>
-          <a href={~p"/jobs?order=random"} class="nav-link">Explore</a>
           <%= if @lead do %>
             <span class="nav-pill">Profile active</span>
             <form action={~p"/logout"} method="post" class="nav-logout-form">
@@ -463,10 +462,25 @@ defmodule PortalWeb.JobHTML do
   def job_tags(job) do
     (parsed_tags(job) ++ [job.category, source_label(job.source)])
     |> Enum.reject(&is_nil_or_empty?/1)
-    |> Enum.map(&String.trim(to_string(&1)))
+    |> Enum.map(&tag_label/1)
     |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
   end
+
+  defp tag_label(%{"name" => name}) when name not in [nil, ""],
+    do: name |> to_string() |> String.trim()
+
+  defp tag_label(%{name: name}) when name not in [nil, ""],
+    do: name |> to_string() |> String.trim()
+
+  defp tag_label(%{"short_name" => short_name}) when short_name not in [nil, ""],
+    do: short_name |> to_string() |> String.replace("-", " ") |> String.trim()
+
+  defp tag_label(%{short_name: short_name}) when short_name not in [nil, ""],
+    do: short_name |> to_string() |> String.replace("-", " ") |> String.trim()
+
+  defp tag_label(value) when is_binary(value), do: String.trim(value)
+  defp tag_label(value), do: value |> inspect() |> String.trim()
 
   def company_initials(job) do
     source = source_label(Map.get(job, :source))

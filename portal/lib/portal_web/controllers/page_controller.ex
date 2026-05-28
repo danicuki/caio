@@ -34,6 +34,8 @@ defmodule PortalWeb.PageController do
         ~s(<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">),
         "  <sitemap><loc>https://caio-jobs.com/sitemap-static.xml</loc></sitemap>",
         "  <sitemap><loc>https://caio-jobs.com/sitemap-companies.xml</loc></sitemap>",
+        "  <sitemap><loc>https://caio-jobs.com/sitemap-locations.xml</loc></sitemap>",
+        "  <sitemap><loc>https://caio-jobs.com/sitemap-keywords.xml</loc></sitemap>",
         "</sitemapindex>"
       ]
       |> Enum.join("\n")
@@ -65,6 +67,32 @@ defmodule PortalWeb.PageController do
         %{
           loc: "https://caio-jobs.com/companies/#{company.slug}",
           lastmod: company.latest_posted_at
+        }
+      end)
+
+    render_urlset(conn, urls)
+  end
+
+  def sitemap_locations(conn, _params) do
+    urls =
+      Jobs.sitemap_locations()
+      |> Enum.map(fn location ->
+        %{
+          loc: "https://caio-jobs.com/jobs?#{URI.encode_query(%{"location" => location.label})}",
+          lastmod: location.latest_posted_at
+        }
+      end)
+
+    render_urlset(conn, urls)
+  end
+
+  def sitemap_keywords(conn, _params) do
+    urls =
+      Jobs.sitemap_keywords()
+      |> Enum.map(fn keyword ->
+        %{
+          loc: "https://caio-jobs.com/jobs?#{URI.encode_query(%{"q" => keyword.label})}",
+          lastmod: keyword.latest_posted_at
         }
       end)
 

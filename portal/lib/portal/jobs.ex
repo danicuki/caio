@@ -137,6 +137,88 @@ defmodule Portal.Jobs do
     if rows == [], do: legacy_sitemap_companies(limit), else: rows
   end
 
+  def sitemap_locations(limit \\ 5_000) do
+    Repo.query!(
+      """
+      SELECT
+        trim(location_city) AS label,
+        count(*) AS jobs_count,
+        max(published_at) AS latest_posted_at
+      FROM job_posts
+      WHERE location_city IS NOT NULL
+        AND trim(location_city) != ''
+        AND (published_at IS NULL OR published_at = '' OR published_at >= ?)
+      GROUP BY lower(trim(location_city))
+      HAVING jobs_count >= 2
+      ORDER BY jobs_count DESC, label ASC
+      LIMIT ?
+      """,
+      [public_cutoff_date(), limit]
+    )
+    |> Map.fetch!(:rows)
+    |> Enum.map(fn [label, count, latest_posted_at] ->
+      %{label: label, count: count, latest_posted_at: latest_posted_at}
+    end)
+  end
+
+  def sitemap_keywords(limit \\ 5_000) do
+    Repo.query!(
+      """
+      SELECT
+        label,
+        count(*) AS jobs_count,
+        max(published_at) AS latest_posted_at
+      FROM (
+        SELECT trim(category) AS label, published_at
+        FROM job_posts
+        WHERE category IS NOT NULL
+          AND trim(category) != ''
+          AND (published_at IS NULL OR published_at = '' OR published_at >= ?)
+
+        UNION ALL
+
+        SELECT
+          trim(
+            CASE json_each.type
+              WHEN 'text' THEN json_each.value
+              WHEN 'object' THEN COALESCE(
+                json_extract(json_each.value, '$.name'),
+                replace(json_extract(json_each.value, '$.short_name'), '-', ' ')
+              )
+              ELSE NULL
+            END
+          ) AS label,
+          job_posts.published_at
+        FROM job_posts,
+          json_each(
+            CASE
+              WHEN json_valid(job_posts.tags_json) THEN job_posts.tags_json
+              ELSE '[]'
+            END
+          )
+        WHERE job_posts.tags_json IS NOT NULL
+          AND job_posts.tags_json != ''
+          AND (job_posts.published_at IS NULL OR job_posts.published_at = '' OR job_posts.published_at >= ?)
+      )
+      WHERE label IS NOT NULL
+        AND label != ''
+        AND length(label) BETWEEN 2 AND 60
+      GROUP BY lower(label)
+      HAVING jobs_count >= 3
+      ORDER BY jobs_count DESC, label ASC
+      LIMIT ?
+      """,
+      [public_cutoff_date(), public_cutoff_date(), limit]
+    )
+    |> Map.fetch!(:rows)
+    |> Enum.map(fn [label, count, latest_posted_at] ->
+      %{label: label, count: count, latest_posted_at: latest_posted_at}
+    end)
+  rescue
+    Exqlite.Error ->
+      sitemap_categories(limit)
+  end
+
   def refresh_companies do
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
@@ -422,6 +504,22 @@ defmodule Portal.Jobs do
     |> Enum.map(fn company ->
       %{company | slug: company_slug(company.name)}
     end)
+  end
+
+  defp sitemap_categories(limit) do
+    JobPost
+    |> public_scope()
+    |> where([j], not is_nil(j.category) and fragment("trim(?)", j.category) != "")
+    |> group_by([j], fragment("lower(trim(?))", j.category))
+    |> having([j], count(j.id) >= 3)
+    |> order_by([j], desc: count(j.id), asc: fragment("min(trim(?))", j.category))
+    |> limit(^limit)
+    |> select([j], %{
+      label: fragment("min(trim(?))", j.category),
+      count: count(j.id),
+      latest_posted_at: max(j.published_at)
+    })
+    |> Repo.all()
   end
 
   defp legacy_company_stats(company) do

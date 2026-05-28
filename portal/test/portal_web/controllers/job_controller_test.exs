@@ -34,6 +34,18 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Continue with Google"
   end
 
+  test "GET /jobs/:id includes JobPosting structured data", %{conn: conn} do
+    job = job_fixture()
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ ~s(<script type="application/ld+json">)
+    assert response =~ ~s("JobPosting")
+    assert response =~ "Senior Elixir Engineer"
+    assert response =~ "Caio Labs"
+  end
+
   test "GET /jobs/:id preserves structured job description HTML", %{conn: conn} do
     job =
       job_fixture(%{
@@ -47,6 +59,46 @@ defmodule PortalWeb.JobControllerTest do
     assert response =~ "<h2>Aufgaben</h2>"
     assert response =~ "<ul><li>Plan systems</li><li>Coordinate teams</li></ul>"
     refute response =~ "Intro Aufgaben Plan systems Coordinate teams"
+  end
+
+  test "GET /jobs renders structured source tags as readable labels", %{conn: conn} do
+    job_fixture(%{
+      tags_json:
+        Jason.encode!([
+          %{"name" => "Fortune 1000", "short_name" => "fortune-1000-companies"},
+          %{"short_name" => "remote-first"}
+        ])
+    })
+
+    conn = get(conn, ~p"/jobs?order=random")
+    response = html_response(conn, 200)
+
+    assert response =~ "Fortune 1000"
+    assert response =~ "remote first"
+    refute response =~ "Protocol.UndefinedError"
+  end
+
+  test "GET /jobs uses search params in title description and canonical", %{conn: conn} do
+    job_fixture(%{
+      title: "Docker Engineer",
+      category: "Platform",
+      location: "Lisbon",
+      location_city: "Lisbon",
+      description: "Build Docker infrastructure."
+    })
+
+    conn = get(conn, ~p"/jobs?q=docker&location=Lisbon&order=random")
+    response = html_response(conn, 200)
+
+    assert response =~ "<title"
+    assert response =~ "Docker jobs in Lisbon · Caio"
+
+    assert response =~
+             ~s(<link rel="canonical" href="https://caio-jobs.com/jobs?q=docker&amp;location=Lisbon")
+
+    assert response =~ "Meet"
+    assert response =~ "docker jobs in Lisbon"
+    assert response =~ ~s("SearchResultsPage")
   end
 
   test "GET /jobs/:id formats plain descriptions with common job headings", %{conn: conn} do

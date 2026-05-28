@@ -21,12 +21,15 @@ defmodule PortalWeb.PageHTML do
   def meta_description(assigns), do: assigns[:meta_description] || @default_description
 
   def canonical_url(assigns) do
-    base = site_url()
     path = assigns[:canonical_path] || current_path(assigns)
-    URI.merge(base, path) |> URI.to_string()
+    absolute_url(path)
   end
 
   def og_image_url(_assigns), do: URI.merge(site_url(), @default_image) |> URI.to_string()
+
+  def absolute_url(path) do
+    URI.merge(site_url(), path) |> URI.to_string()
+  end
 
   def delimit(number) do
     number

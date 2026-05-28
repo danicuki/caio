@@ -19,6 +19,8 @@ defmodule PortalWeb.CompanyControllerTest do
     refute response =~ "Other Company"
     assert response =~ "Open roles"
     assert response =~ "Sources"
+    assert response =~ ~s("Organization")
+    assert response =~ "https://caio-jobs.com/companies/caio-labs"
   end
 
   test "GET /companies/:slug returns 404 for unknown company", %{conn: conn} do
