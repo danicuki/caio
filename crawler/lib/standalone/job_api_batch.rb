@@ -2378,6 +2378,8 @@ module Standalone
           link.parent
         company = company_name(card, link)
         body = card&.text.to_s.gsub(/\s+/, " ").strip
+        detail = fetch_detail_job(canonical)
+        return detail if detail
 
         {
           source_key: canonical[%r{/job/[^/]+/(\d+)}, 1] || Digest::SHA256.hexdigest(canonical),
@@ -2394,6 +2396,116 @@ module Standalone
           description: body.empty? ? nil : "<p>#{CGI.escapeHTML(body)}</p>",
           raw: { "builtin_url" => canonical }
         }
+      end
+
+      def fetch_detail_job(url)
+        return nil unless ENV.fetch("BUILTIN_FETCH_DETAIL", "true") == "true"
+
+        html = get_html(url)
+        job = json_ld_jobs(html).first
+        return nil unless job
+
+        canonical = job["url"].to_s.empty? ? url : URI.join(url, job["url"].to_s).to_s
+        description = job["description"].to_s.strip
+
+        {
+          source_key: canonical[%r{/job/[^/]+/(\d+)}, 1] || Digest::SHA256.hexdigest(canonical),
+          title: job["title"].to_s.strip,
+          company: organization_name(job["hiringOrganization"]),
+          location: location_name(job["jobLocation"]),
+          remote: job.to_s.match?(/remote/i) ? true : nil,
+          employment_type: Array(job["employmentType"]).reject(&:empty?).join(", "),
+          category: nil,
+          salary: salary_from_json_ld(job["baseSalary"]),
+          source_url: canonical,
+          published_at: parse_time(job["datePosted"]),
+          tags: Array(job["employmentType"]).reject(&:empty?),
+          description: description.empty? ? nil : description,
+          raw: job.merge("builtin_url" => canonical)
+        }
+      rescue StandardError => e
+        warn "builtin detail failed url=#{url}: #{e.class}: #{e.message}"
+        nil
+      end
+
+      def json_ld_jobs(html)
+        Nokogiri::HTML(html).css("script").flat_map do |script|
+          next [] unless script["type"].to_s.casecmp("application/ld+json").zero?
+
+          parse_json_ld(script.text)
+        end
+      end
+
+      def parse_json_ld(script)
+        find_job_postings(JSON.parse(CGI.unescapeHTML(script.to_s.strip)))
+      rescue JSON::ParserError
+        []
+      end
+
+      def find_job_postings(value)
+        case value
+        when Array
+          value.flat_map { |entry| find_job_postings(entry) }
+        when Hash
+          type = value["@type"]
+          matches = Array(type).map(&:to_s).any? { |item| item.casecmp("JobPosting").zero? } ? [value] : []
+          graph = value["@graph"] ? find_job_postings(value["@graph"]) : []
+          children = value.values.grep(Hash).flat_map { |child| find_job_postings(child) }
+          matches + graph + children
+        else
+          []
+        end
+      end
+
+      def organization_name(organization)
+        return organization["name"].to_s.strip if organization.is_a?(Hash)
+
+        organization.to_s.strip
+      end
+
+      def location_name(location)
+        case location
+        when Array
+          location.map { |entry| location_name(entry) }.reject(&:empty?).join(", ")
+        when Hash
+          address = location["address"]
+          return address.to_s.strip unless address.is_a?(Hash)
+
+          [
+            address["addressLocality"],
+            address["addressRegion"],
+            address["addressCountry"]
+          ].compact.reject(&:empty?).join(", ")
+        else
+          location.to_s.strip
+        end
+      end
+
+      def salary_from_json_ld(base_salary)
+        return nil unless base_salary.is_a?(Hash)
+
+        value = base_salary["value"]
+        currency = base_salary["currency"].to_s
+        period = value.is_a?(Hash) ? value["unitText"].to_s : nil
+        min = value.is_a?(Hash) ? value["minValue"] : nil
+        max = value.is_a?(Hash) ? value["maxValue"] : nil
+        amount = value.is_a?(Hash) ? value["value"] : value
+
+        range =
+          if min && max
+            "#{format_salary_amount(min)} - #{format_salary_amount(max)}"
+          elsif amount
+            format_salary_amount(amount)
+          end
+
+        [range, currency, period].compact.reject(&:empty?).join(" ")
+      end
+
+      def format_salary_amount(value)
+        number = Float(value)
+        number >= 10_000 ? number.round.to_s : number.to_s
+      rescue ArgumentError, TypeError
+        value.to_s
       end
 
       def company_name(card, job_link)
