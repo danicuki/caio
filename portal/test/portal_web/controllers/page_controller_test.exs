@@ -63,6 +63,8 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /hiring-now excludes noisy non-tech companies", %{conn: conn} do
+    Portal.Repo.delete_all(Portal.Jobs.Company)
+
     insert_company("boschgroup", "BoschGroup", 6_667)
     insert_company("dominos", "DominoS", 5_846)
     insert_company("google", "Google", 888)
@@ -109,6 +111,7 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /sitemap-companies.xml lists company pages", %{conn: conn} do
+    Portal.Repo.delete_all(Portal.Jobs.Company)
     insert_company_job("Caio Labs")
 
     conn = get(conn, "/sitemap-companies.xml")
@@ -181,17 +184,21 @@ defmodule PortalWeb.PageControllerTest do
   defp insert_company(id, name, open_jobs_count) do
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-    Portal.Repo.insert!(%Portal.Jobs.Company{
-      id: id,
-      name: name,
-      open_jobs_count: open_jobs_count,
-      source_count: 1,
-      location_count: 1,
-      remote_count: 0,
-      salary_count: 0,
-      latest_posted_at: Date.utc_today() |> Date.to_iso8601(),
-      created_at: now,
-      updated_at: now
-    })
+    Portal.Repo.insert!(
+      %Portal.Jobs.Company{
+        id: id,
+        name: name,
+        open_jobs_count: open_jobs_count,
+        source_count: 1,
+        location_count: 1,
+        remote_count: 0,
+        salary_count: 0,
+        latest_posted_at: Date.utc_today() |> Date.to_iso8601(),
+        created_at: now,
+        updated_at: now
+      },
+      on_conflict: :replace_all,
+      conflict_target: :id
+    )
   end
 end

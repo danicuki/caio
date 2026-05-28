@@ -931,44 +931,20 @@ defmodule Portal.Jobs do
     cutoff = public_cutoff_date()
 
     query
-    |> where(
-      [j],
-      not fragment(
-        """
-        lower(coalesce(?, '')) LIKE '%mechanical engineer%'
-        OR lower(coalesce(?, '')) LIKE '%industrial engineer%'
-        OR lower(coalesce(?, '')) LIKE '%cad designer%'
-        OR lower(coalesce(?, '')) LIKE '%cad drafter%'
-        OR lower(coalesce(?, '')) LIKE '%mechanical engineering%'
-        OR lower(coalesce(?, '')) LIKE '%industrial engineering%'
-        OR lower(coalesce(?, '')) LIKE '%mechanical design%'
-        OR lower(coalesce(?, '')) LIKE '%hvac%'
-        OR lower(coalesce(?, '')) LIKE '%building services%'
-        OR lower(coalesce(?, '')) LIKE '%delivery driver%'
-        OR lower(coalesce(?, '')) LIKE '%customer service rep%'
-        OR lower(coalesce(?, '')) LIKE '%warehouse%'
-        OR lower(coalesce(?, '')) LIKE '%general business%'
-        OR lower(coalesce(?, '')) LIKE '%restaurants%'
-        """,
-        j.title,
-        j.title,
-        j.title,
-        j.title,
-        j.category,
-        j.category,
-        j.category,
-        j.category,
-        j.category,
-        j.title,
-        j.title,
-        j.title,
-        j.category,
-        j.tags_json
-      )
-    )
+    |> exclude_noisy_job_companies()
     |> where(
       [j],
       is_nil(j.published_at) or j.published_at == "" or j.published_at >= ^cutoff
+    )
+  end
+
+  defp exclude_noisy_job_companies(query) do
+    where(
+      query,
+      [j],
+      (is_nil(j.company) or j.company not in ^noisy_job_company_names()) and
+        (is_nil(j.category) or j.category not in ^noisy_job_categories()) and
+        (is_nil(j.title) or j.title not in ^noisy_job_titles())
     )
   end
 
@@ -987,6 +963,54 @@ defmodule Portal.Jobs do
       sgs jysk eurofins abbvie alten securitas redbull kreyco
       insurance-office-of-america
     )
+  end
+
+  defp noisy_job_company_names do
+    [
+      "BoschGroup",
+      "Bosch Group",
+      "DominoS",
+      "Domino's",
+      "Jobgether",
+      "CityOfNewYork",
+      "City of New York",
+      "SGS",
+      "JYSK",
+      "Eurofins",
+      "AbbVie",
+      "ALTEN",
+      "Securitas",
+      "RedBull",
+      "Red Bull",
+      "Kreyco",
+      "Insurance Office of America"
+    ]
+  end
+
+  defp noisy_job_categories do
+    [
+      "Mechanical Engineering",
+      "Mechanical Or Industrial Engineering",
+      "Industrial Engineering",
+      "Mechanical Design",
+      "General Business",
+      "Restaurants",
+      "Manufacturing",
+      "Supply Chain",
+      "Human Resources",
+      "Accounting/Auditing"
+    ]
+  end
+
+  defp noisy_job_titles do
+    [
+      "Mechanical Engineer",
+      "Industrial Engineer",
+      "CAD Designer",
+      "Delivery Driver",
+      "Customer Service Rep",
+      "Warehouse Order Selector"
+    ]
   end
 
   defp noisy_company_names do
