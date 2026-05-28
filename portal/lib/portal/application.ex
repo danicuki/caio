@@ -14,6 +14,7 @@ defmodule Portal.Application do
        repos: Application.fetch_env!(:portal, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:portal, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Portal.PubSub},
+      {Task.Supervisor, name: Portal.EmailSupervisor},
       # Start a worker by calling: Portal.Worker.start_link(arg)
       # {Portal.Worker, arg},
       # Start to serve requests, typically the last entry

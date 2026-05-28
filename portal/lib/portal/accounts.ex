@@ -2,6 +2,7 @@ defmodule Portal.Accounts do
   import Ecto.Query
 
   alias Portal.Accounts.{JobInterest, Lead}
+  alias Portal.Email
   alias Portal.Repo
 
   def get_lead(nil), do: nil
@@ -15,6 +16,10 @@ defmodule Portal.Accounts do
         %Lead{}
         |> Lead.changeset(attrs)
         |> Repo.insert()
+        |> tap(fn
+          {:ok, lead} -> Email.deliver_welcome_async(lead)
+          _ -> :ok
+        end)
 
       lead ->
         lead

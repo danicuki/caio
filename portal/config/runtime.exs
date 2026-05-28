@@ -41,6 +41,12 @@ config :portal, :founder_chat,
   telegram_forum_topics:
     System.get_env("TELEGRAM_FORUM_TOPICS", "true") in ["1", "true", "TRUE", "yes"]
 
+config :portal, :email,
+  enabled: System.get_env("RESEND_ENABLED", "false") in ["1", "true", "TRUE", "yes"],
+  api_key: System.get_env("RESEND_API_KEY"),
+  from: System.get_env("RESEND_FROM", "Daniel <contact@caio-jobs.com>"),
+  reply_to: System.get_env("RESEND_REPLY_TO", "contact@caio-jobs.com")
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||
