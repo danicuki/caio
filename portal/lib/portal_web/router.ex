@@ -1,5 +1,6 @@
 defmodule PortalWeb.Router do
   use PortalWeb, :router
+  import Backpex.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -19,6 +20,10 @@ defmodule PortalWeb.Router do
     plug :fetch_session
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+  end
+
+  pipeline :admin do
+    plug PortalWeb.Plugs.AdminAuth
   end
 
   scope "/", PortalWeb do
@@ -61,6 +66,22 @@ defmodule PortalWeb.Router do
     pipe_through :api
 
     post "/telegram/webhook/:secret", ChatController, :telegram_webhook
+  end
+
+  scope "/admin", PortalWeb do
+    pipe_through [:browser, :admin]
+
+    get "/", AdminController, :index
+    backpex_routes()
+
+    live_session :admin, on_mount: Backpex.InitAssigns do
+      live_resources "/leads", Admin.LeadLive
+      live_resources "/job-interests", Admin.JobInterestLive, only: [:index, :show]
+      live_resources "/companies", Admin.CompanyLive
+      live_resources "/jobs", Admin.JobPostLive, only: [:index, :show]
+      live_resources "/chat-conversations", Admin.ChatConversationLive
+      live_resources "/chat-messages", Admin.ChatMessageLive, only: [:index, :show]
+    end
   end
 
   # Other scopes may use custom stacks.

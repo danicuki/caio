@@ -47,6 +47,10 @@ config :portal, :email,
   from: System.get_env("RESEND_FROM", "Daniel <contact@caio-jobs.com>"),
   reply_to: System.get_env("RESEND_REPLY_TO", "contact@caio-jobs.com")
 
+config :portal, :admin,
+  username: System.get_env("ADMIN_USERNAME"),
+  password: System.get_env("ADMIN_PASSWORD")
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||

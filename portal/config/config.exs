@@ -11,6 +11,8 @@ config :portal,
   ecto_repos: [Portal.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :backpex, :pubsub_server, Portal.PubSub
+
 # Configure the endpoint
 config :portal, PortalWeb.Endpoint,
   url: [host: "localhost"],

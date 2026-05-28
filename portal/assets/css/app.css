@@ -5,6 +5,8 @@
 @source "../css";
 @source "../js";
 @source "../../lib/portal_web";
+@source "../../deps/backpex/**/*.*ex";
+@source "../../deps/backpex/assets/js/**/*.*js";
 
 @plugin "../vendor/heroicons";
 

@@ -20,31 +20,32 @@
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
-// import {Socket} from "phoenix"
-// import {LiveSocket} from "phoenix_live_view"
+import {Socket} from "phoenix"
+import {LiveSocket} from "phoenix_live_view"
+import {Hooks as BackpexHooks} from "backpex"
 // import {hooks as colocatedHooks} from "phoenix-colocated/portal"
-// import topbar from "../vendor/topbar"
+import topbar from "../vendor/topbar"
 
-// const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
-// const liveSocket = new LiveSocket("/live", Socket, {
-//   longPollFallbackMs: 2500,
-//   params: {_csrf_token: csrfToken},
-//   hooks: {...colocatedHooks},
-// })
+const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const liveSocket = new LiveSocket("/live", Socket, {
+  longPollFallbackMs: 2500,
+  params: {_csrf_token: csrfToken},
+  hooks: {...BackpexHooks},
+})
 
 // Show progress bar on live navigation and form submits
-// topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
-// window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
-// window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+topbar.config({barColors: {0: "#0E5C49"}, shadowColor: "rgba(0, 0, 0, .2)"})
+window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
+window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 // connect if there are any LiveViews on the page
-// liveSocket.connect()
+liveSocket.connect()
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
-// window.liveSocket = liveSocket
+window.liveSocket = liveSocket
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:
