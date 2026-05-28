@@ -18,6 +18,9 @@
   </:topbar>
 
   <:sidebar>
+    <Backpex.HTML.Layout.sidebar_item current_url={@current_url} navigate={~p"/admin/crawler"}>
+      <.icon name="hero-chart-bar" class="size-5" /> Crawler
+    </Backpex.HTML.Layout.sidebar_item>
     <Backpex.HTML.Layout.sidebar_item current_url={@current_url} navigate={~p"/admin/leads"}>
       <.icon name="hero-envelope" class="size-5" /> Leads
     </Backpex.HTML.Layout.sidebar_item>

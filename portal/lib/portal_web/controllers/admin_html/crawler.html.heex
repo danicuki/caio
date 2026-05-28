@@ -1,0 +1,225 @@
+<main class="min-h-screen bg-[var(--bg)] px-4 py-6 text-[var(--ink)] sm:px-6 lg:px-8">
+  <section class="mx-auto max-w-7xl space-y-6">
+    <header class="flex flex-col gap-4 border-b border-[var(--line)] pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--amber)]">
+          Caio admin
+        </p>
+        <h1 class="mt-2 font-serif text-4xl leading-tight text-[var(--ink)]">
+          Crawler observability
+        </h1>
+        <p class="mt-2 max-w-3xl text-sm text-[var(--muted)]">
+          Source runs show crawler activity. New jobs are actual rows inserted into <code>job_posts</code>.
+          If source runs are high and new jobs are low, the crawler is busy but mostly reprocessing duplicates.
+        </p>
+      </div>
+      <nav class="flex flex-wrap gap-2 text-sm">
+        <.link
+          href={~p"/admin/leads"}
+          class="rounded-md border border-[var(--line)] px-3 py-2 hover:bg-[var(--paper)]"
+        >
+          Leads
+        </.link>
+        <.link
+          href={~p"/admin/jobs"}
+          class="rounded-md border border-[var(--line)] px-3 py-2 hover:bg-[var(--paper)]"
+        >
+          Jobs
+        </.link>
+        <.link href={~p"/"} class="rounded-md bg-[var(--ink)] px-3 py-2 text-[var(--paper)]">
+          Back to site
+        </.link>
+      </nav>
+    </header>
+
+    <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <.metric
+        label="Total jobs"
+        value={format_count(@stats.summary["total_jobs"])}
+        detail={"latest #{@stats.summary["latest_job_at"] || "never"}"}
+      />
+      <.metric
+        label="New jobs / 1h"
+        value={format_count(@stats.summary["jobs_last_hour"])}
+        detail={"#{format_count(@stats.summary["runs_last_hour"])} source runs"}
+      />
+      <.metric
+        label="New jobs / 24h"
+        value={format_count(@stats.summary["jobs_last_day"])}
+        detail={"#{format_count(@stats.summary["imported_last_day"])} imported signals"}
+      />
+      <.metric
+        label="1M target gap"
+        value={format_count(max(1_000_000 - (@stats.summary["total_jobs"] || 0), 0))}
+        detail="raw database rows"
+      />
+    </section>
+
+    <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold">Last 24 hours</h2>
+            <p class="text-sm text-[var(--muted)]">New rows versus crawler work.</p>
+          </div>
+          <span class="rounded-full bg-[var(--amber-soft)] px-3 py-1 text-xs font-semibold text-[var(--amber-2)]">
+            {per_1k(@stats.summary["jobs_last_day"], @stats.summary["imported_last_day"])} new / 1k imports
+          </span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="border-b border-[var(--line)] text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+              <tr>
+                <th class="py-2 pr-4">Hour</th>
+                <th class="py-2 pr-4">New jobs</th>
+                <th class="py-2 pr-4">Runs</th>
+                <th class="py-2 pr-4">Fetched</th>
+                <th class="py-2 pr-4">Imported</th>
+                <th class="py-2 pr-4">Errors</th>
+                <th class="py-2">Signal</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--line-2)]">
+              <tr :for={row <- @stats.hourly}>
+                <td class="py-2 pr-4 font-mono text-xs">{row["bucket"]}</td>
+                <td class="py-2 pr-4 font-semibold">{format_count(row["new_jobs"])}</td>
+                <td class="py-2 pr-4">{format_count(row["runs"])}</td>
+                <td class="py-2 pr-4">{format_count(row["fetched"])}</td>
+                <td class="py-2 pr-4">{format_count(row["imported"])}</td>
+                <td class="py-2 pr-4">{format_count(row["errors"])}</td>
+                <td class="py-2">
+                  <div class="h-2 w-32 overflow-hidden rounded-full bg-[var(--line)]">
+                    <div
+                      class="h-full rounded-full bg-[var(--green)]"
+                      style={bar_width(row["new_jobs"], max_value(@stats.hourly, "new_jobs"))}
+                    >
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-5 shadow-sm">
+        <h2 class="text-lg font-semibold">Daily progress</h2>
+        <p class="mb-4 text-sm text-[var(--muted)]">Actual new rows inserted per day.</p>
+        <div class="space-y-3">
+          <div
+            :for={row <- @stats.daily}
+            class="grid grid-cols-[7rem_1fr_5rem] items-center gap-3 text-sm"
+          >
+            <span class="font-mono text-xs text-[var(--muted)]">{row["bucket"]}</span>
+            <div class="h-3 overflow-hidden rounded-full bg-[var(--line)]">
+              <div
+                class="h-full rounded-full bg-[var(--green)]"
+                style={bar_width(row["new_jobs"], max_value(@stats.daily, "new_jobs"))}
+              >
+              </div>
+            </div>
+            <strong class="text-right">{format_count(row["new_jobs"])}</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold">Source efficiency</h2>
+        <p class="text-sm text-[var(--muted)]">
+          Sorted by new jobs in the last 24h. Low new jobs with high imported/fetched counts is where we are wasting crawler time.
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[980px] text-left text-sm">
+          <thead class="border-b border-[var(--line)] text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+            <tr>
+              <th class="py-2 pr-4">Source</th>
+              <th class="py-2 pr-4">New 24h</th>
+              <th class="py-2 pr-4">Runs</th>
+              <th class="py-2 pr-4">Fetched</th>
+              <th class="py-2 pr-4">Imported</th>
+              <th class="py-2 pr-4">New / 1k imports</th>
+              <th class="py-2 pr-4">Errors</th>
+              <th class="py-2">Last run</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[var(--line-2)]">
+            <tr :for={source <- @stats.sources}>
+              <td class="py-2 pr-4 font-semibold">{source["source"]}</td>
+              <td class="py-2 pr-4">{format_count(source["new_jobs_24h"])}</td>
+              <td class="py-2 pr-4">{format_count(source["runs_24h"])}</td>
+              <td class="py-2 pr-4">{format_count(source["fetched_24h"])}</td>
+              <td class="py-2 pr-4">{format_count(source["imported_24h"])}</td>
+              <td class="py-2 pr-4">{per_1k(source["new_jobs_24h"], source["imported_24h"])}</td>
+              <td class="py-2 pr-4">{format_count(source["errors_24h"])}</td>
+              <td class="py-2" style={stale_style(source["last_run_at"])}>
+                {source["last_run_at"]}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid gap-6 xl:grid-cols-2">
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-5 shadow-sm">
+        <h2 class="text-lg font-semibold">Source cursors</h2>
+        <p class="mb-4 text-sm text-[var(--muted)]">
+          Stateful cursors and blocked/exhausted sources.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="border-b border-[var(--line)] text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+              <tr>
+                <th class="py-2 pr-4">Source</th>
+                <th class="py-2 pr-4">Cursor</th>
+                <th class="py-2 pr-4">Done</th>
+                <th class="py-2 pr-4">Last error</th>
+                <th class="py-2">Updated</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--line-2)]">
+              <tr :for={state <- @stats.states}>
+                <td class="py-2 pr-4 font-semibold">{state["source"]}</td>
+                <td class="py-2 pr-4 font-mono text-xs">{state["next_cursor"]}</td>
+                <td class="py-2 pr-4">
+                  {if state["exhausted"] in [1, true], do: "yes", else: "no"}
+                </td>
+                <td class="max-w-xs truncate py-2 pr-4 text-[var(--red)]">
+                  {state["last_error"]}
+                </td>
+                <td class="py-2">{state["updated_at"]}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-5 shadow-sm">
+        <h2 class="text-lg font-semibold">Recent errors</h2>
+        <p class="mb-4 text-sm text-[var(--muted)]">
+          Latest source runs with non-imported status or an error message.
+        </p>
+        <div class="space-y-3">
+          <div
+            :for={run <- @stats.recent_errors}
+            class="rounded-lg border border-[var(--line)] bg-[var(--paper-2)] p-3"
+          >
+            <div class="flex items-center justify-between gap-3 text-sm">
+              <strong>{run["source"]}</strong>
+              <span class="font-mono text-xs text-[var(--muted)]">{run["created_at"]}</span>
+            </div>
+            <p class="mt-1 text-xs text-[var(--muted)]">
+              status={run["status"]} fetched={format_count(run["fetched_count"])} imported={format_count(
+                run["imported_count"]
+              )}
+            </p>
+            <p class="mt-2 text-sm text-[var(--red)]">{run["error_message"]}</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </section>
+</main>

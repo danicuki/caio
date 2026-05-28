@@ -72,6 +72,7 @@ defmodule PortalWeb.Router do
     pipe_through [:browser, :admin]
 
     get "/", AdminController, :index
+    get "/crawler", AdminController, :crawler
     backpex_routes()
 
     live_session :admin, on_mount: Backpex.InitAssigns do
