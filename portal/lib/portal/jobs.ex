@@ -10,6 +10,7 @@ defmodule Portal.Jobs do
   @guest_preview 18
   @member_limit 50
   @sitemap_url_limit 50_000
+  @sitemap_refresh_opts [timeout: :infinity]
   @list_fields [
     :id,
     :source,
@@ -151,10 +152,13 @@ defmodule Portal.Jobs do
     locations = location_sitemap_rows()
     keywords = keyword_sitemap_rows()
 
-    Repo.transaction(fn ->
-      refresh_sitemap_facet("location", locations, now)
-      refresh_sitemap_facet("keyword", keywords, now)
-    end)
+    Repo.transaction(
+      fn ->
+        refresh_sitemap_facet("location", locations, now)
+        refresh_sitemap_facet("keyword", keywords, now)
+      end,
+      @sitemap_refresh_opts
+    )
 
     %{locations: length(locations), keywords: length(keywords)}
   end
@@ -177,7 +181,7 @@ defmodule Portal.Jobs do
   end
 
   defp refresh_sitemap_facet(facet, rows, now) do
-    Repo.query!("DELETE FROM sitemap_facets WHERE facet = ?", [facet])
+    Repo.query!("DELETE FROM sitemap_facets WHERE facet = ?", [facet], @sitemap_refresh_opts)
 
     rows
     |> Enum.map(fn %{label: label, count: count, latest_posted_at: latest_posted_at} ->
@@ -191,7 +195,7 @@ defmodule Portal.Jobs do
     end)
     |> Enum.chunk_every(500)
     |> Enum.each(fn chunk ->
-      Repo.insert_all("sitemap_facets", chunk)
+      Repo.insert_all("sitemap_facets", chunk, @sitemap_refresh_opts)
     end)
   end
 
@@ -211,7 +215,8 @@ defmodule Portal.Jobs do
       ORDER BY jobs_count DESC, label ASC
       LIMIT ?
       """,
-      [public_cutoff_date(), limit]
+      [public_cutoff_date(), limit],
+      @sitemap_refresh_opts
     )
     |> Map.fetch!(:rows)
     |> Enum.map(fn [label, count, latest_posted_at] ->
@@ -266,7 +271,8 @@ defmodule Portal.Jobs do
       ORDER BY jobs_count DESC, label ASC
       LIMIT ?
       """,
-      [public_cutoff_date(), public_cutoff_date(), limit]
+      [public_cutoff_date(), public_cutoff_date(), limit],
+      @sitemap_refresh_opts
     )
     |> Map.fetch!(:rows)
     |> Enum.map(fn [label, count, latest_posted_at] ->
