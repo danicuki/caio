@@ -78,6 +78,50 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Protocol.UndefinedError"
   end
 
+  test "GET /jobs hides obvious non-tech engineering roles", %{conn: conn} do
+    job_fixture(%{
+      title: "Mechanical Engineer",
+      category: "Mechanical Engineering",
+      tags_json: Jason.encode!(["Mechanical Or Industrial Engineering"])
+    })
+
+    job_fixture(%{
+      title: "Backend Engineer",
+      category: "Software Engineering",
+      tags_json: Jason.encode!(["Ruby", "Postgres"])
+    })
+
+    conn = get(conn, ~p"/jobs?order=random")
+    response = html_response(conn, 200)
+
+    assert response =~ "Backend Engineer"
+    refute response =~ "Mechanical Engineer"
+    refute response =~ "Mechanical Or Industrial Engineering"
+  end
+
+  test "GET /jobs hides restaurant delivery roles", %{conn: conn} do
+    job_fixture(%{
+      title: "Delivery Driver",
+      company: "DominoS",
+      category: "General Business",
+      tags_json: Jason.encode!(["Restaurants"])
+    })
+
+    job_fixture(%{
+      title: "Software Engineer",
+      company: "Canva",
+      category: "Software Engineering",
+      tags_json: Jason.encode!(["Frontend"])
+    })
+
+    conn = get(conn, ~p"/jobs?order=random")
+    response = html_response(conn, 200)
+
+    assert response =~ "Software Engineer"
+    refute response =~ "Delivery Driver"
+    refute response =~ "DominoS"
+  end
+
   test "GET /jobs uses search params in title description and canonical", %{conn: conn} do
     job_fixture(%{
       title: "Docker Engineer",

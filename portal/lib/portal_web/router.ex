@@ -43,6 +43,10 @@ defmodule PortalWeb.Router do
     get "/terms", PageController, :terms
     get "/status", PageController, :status
     get "/changelog", PageController, :changelog
+    get "/hiring-now", PageController, :hiring_now
+    get "/remote-tech-jobs", PageController, :remote_tech_jobs
+    get "/startup-jobs", PageController, :startup_jobs
+    get "/top-skills", PageController, :top_skills
     get "/auth/github", AuthController, :github
     get "/auth/github/callback", AuthController, :github_callback
     get "/jobs", JobController, :index

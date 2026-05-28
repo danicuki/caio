@@ -635,6 +635,43 @@ button {
   font-size: 13px;
 }
 
+.hero-quick-searches {
+  display: flex;
+  max-width: 680px;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.hero-quick-searches > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hero-quick-searches a,
+.quick-search-list a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--green-2);
+  background: var(--paper);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.hero-quick-searches a:hover,
+.quick-search-list a:hover {
+  border-color: rgba(14, 92, 73, 0.34);
+  background: var(--green-soft);
+}
+
 .live-index-panel,
 .map-card,
 .preview-card,
@@ -643,6 +680,11 @@ button {
 .job-card,
 .empty-state,
 .unlock-box,
+.share-search-strip,
+.agent-inline-cta,
+.agent-soft-cta,
+.acquisition-hero-card,
+.acquisition-card,
 .feature-band article {
   border: 1px solid var(--line);
   background: var(--paper-2);
@@ -915,12 +957,85 @@ button {
   line-height: 1.55;
 }
 
+.agent-soft-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 54px;
+  padding: 26px;
+  border-radius: var(--r-xl);
+  background:
+    linear-gradient(135deg, rgba(14, 92, 73, 0.08), rgba(194, 122, 26, 0.10)),
+    var(--paper-2);
+}
+
+.agent-soft-cta h2 {
+  max-width: 760px;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 400;
+  line-height: 1.08;
+}
+
+.agent-soft-cta p {
+  max-width: 720px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.home-agent-cta {
+  margin-top: -14px;
+}
+
 .search-command {
   display: flex;
   align-items: end;
   justify-content: space-between;
   gap: 24px;
   padding: 24px 0;
+}
+
+.share-search-strip,
+.agent-inline-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+}
+
+.share-search-strip strong,
+.agent-inline-cta strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.share-search-strip span,
+.agent-inline-cta span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.agent-inline-cta {
+  margin-top: 18px;
+  margin-bottom: 0;
+  background:
+    linear-gradient(135deg, rgba(14, 92, 73, 0.07), rgba(194, 122, 26, 0.08)),
+    var(--paper-2);
+}
+
+.detail-agent-cta {
+  margin-top: 18px;
 }
 
 .search-command h1 {
@@ -2258,6 +2373,119 @@ button {
   background: var(--green-soft);
 }
 
+.acquisition-shell {
+  padding-bottom: 56px;
+}
+
+.acquisition-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 28px;
+  align-items: end;
+  padding: 42px 0 28px;
+}
+
+.acquisition-hero h1 {
+  max-width: 860px;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(42px, 5.4vw, 76px);
+  font-weight: 400;
+  line-height: 0.98;
+}
+
+.acquisition-hero p {
+  max-width: 720px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.acquisition-hero-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border-radius: var(--r-lg);
+}
+
+.acquisition-hero-card strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.acquisition-hero-card span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.quick-search-band {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 24px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+}
+
+.quick-search-band h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.08;
+}
+
+.quick-search-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acquisition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 28px 0;
+}
+
+.acquisition-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--r-lg);
+}
+
+.acquisition-card-top {
+  display: flex;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+}
+
+.acquisition-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.acquisition-card small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .alert {
   border-radius: var(--r-md);
 }
@@ -2330,6 +2558,20 @@ button {
 
   .company-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .acquisition-hero,
+  .quick-search-band {
+    grid-template-columns: 1fr;
+  }
+
+  .acquisition-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-soft-cta {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .site-footer-inner {
@@ -2615,6 +2857,13 @@ button {
     font-size: 14px;
   }
 
+  .hero-quick-searches {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+
   .job-count-badge {
     width: 100%;
     align-items: flex-start;
@@ -2664,6 +2913,62 @@ button {
   .feature-band {
     grid-template-columns: 1fr;
     padding: 30px 0;
+  }
+
+  .agent-soft-cta {
+    margin-bottom: 34px;
+    padding: 18px;
+    border-radius: var(--r-lg);
+  }
+
+  .agent-soft-cta h2 {
+    font-size: 28px;
+  }
+
+  .share-search-strip,
+  .agent-inline-cta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .share-search-strip .secondary-button,
+  .agent-inline-cta .secondary-button {
+    width: 100%;
+  }
+
+  .acquisition-hero {
+    padding: 30px 0 20px;
+  }
+
+  .acquisition-hero h1 {
+    font-size: 38px;
+  }
+
+  .acquisition-hero p {
+    font-size: 14px;
+  }
+
+  .quick-search-band {
+    gap: 14px;
+    padding: 20px 0;
+  }
+
+  .quick-search-band h2 {
+    font-size: 26px;
+  }
+
+  .acquisition-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 0;
+  }
+
+  .acquisition-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .acquisition-card .secondary-button {
+    width: 100%;
   }
 
   .site-footer {

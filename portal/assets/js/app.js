@@ -156,6 +156,24 @@ const capture = (event, properties = {}) => {
   if (window.posthog?.capture) window.posthog.capture(event, properties)
 }
 
+const urlParams = new URLSearchParams(window.location.search)
+const utmProperties = {}
+;["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach((key) => {
+  const value = urlParams.get(key)
+  if (value) utmProperties[key] = value
+})
+
+if (Object.keys(utmProperties).length > 0) {
+  capture("acquisition_landing", {
+    path: window.location.pathname,
+    ...utmProperties,
+  })
+
+  if (window.posthog?.register_once) {
+    window.posthog.register_once(utmProperties)
+  }
+}
+
 // Mobile navigation menu
 document.querySelectorAll(".topbar").forEach((topbar) => {
   const button = topbar.querySelector(".mobile-menu-button")
@@ -197,6 +215,49 @@ document.querySelectorAll("form[action='/jobs']").forEach((form) => {
       company: data.get("company"),
       location: data.get("location"),
       order: data.get("order"),
+    })
+  })
+})
+
+document.querySelectorAll("[data-copy-search-url]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const url = window.location.href
+
+    try {
+      await navigator.clipboard.writeText(url)
+      button.textContent = "Copied"
+      window.setTimeout(() => {
+        button.textContent = "Copy search link"
+      }, 1600)
+      capture("search_link_copied", {
+        label: button.dataset.shareLabel,
+        path: window.location.pathname,
+        query: window.location.search,
+      })
+    } catch (_error) {
+      capture("search_link_copy_failed", {
+        label: button.dataset.shareLabel,
+        path: window.location.pathname,
+      })
+    }
+  })
+})
+
+document.querySelectorAll("[data-agent-cta]").forEach((link) => {
+  link.addEventListener("click", () => {
+    capture("agent_cta_clicked", {
+      cta: link.dataset.agentCta,
+      path: window.location.pathname,
+    })
+  })
+})
+
+document.querySelectorAll("[data-acquisition-link]").forEach((link) => {
+  link.addEventListener("click", () => {
+    capture("acquisition_link_clicked", {
+      kind: link.dataset.acquisitionLink,
+      href: link.getAttribute("href"),
+      path: window.location.pathname,
     })
   })
 })

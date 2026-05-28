@@ -31,6 +31,13 @@
         <p class="privacy-note">
           Free preview. Unlock the full index with an email, no password.
         </p>
+
+        <div class="hero-quick-searches" aria-label="Popular job searches">
+          <span>Fast starts</span>
+          <%= for search <- @quick_searches do %>
+            <a href={search.path} data-acquisition-link="home_quick_search">{search.label}</a>
+          <% end %>
+        </div>
       </div>
 
       <aside class="live-index-panel" aria-label="Live job index snapshot">
@@ -103,6 +110,24 @@
       <h2>Salary comparisons</h2>
       <p>When postings include compensation, Caio keeps it visible instead of buried in prose.</p>
     </article>
+  </section>
+
+  <section class="agent-soft-cta home-agent-cta">
+    <div>
+      <span class="eyebrow">Search is only step one</span>
+      <h2>Use the portal freely. If applying becomes a grind, Caio can help there too.</h2>
+      <p>
+        After signup, Daniel sends the Agent offer directly: Caio can help find matches,
+        adapt your CV, and apply consistently when you want that level of support.
+      </p>
+    </div>
+    <a
+      href="mailto:contact@caio-jobs.com?subject=Caio%20Agent%20setup"
+      class="secondary-button"
+      data-agent-cta="home_agent"
+    >
+      Ask about Agent
+    </a>
   </section>
 
   <%= unless @lead do %>

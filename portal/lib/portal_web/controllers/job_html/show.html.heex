@@ -43,6 +43,22 @@
       <%= unless @lead do %>
         <.unlock_panel return_to={~p"/jobs/#{@job.id}"} params={%{}} variant="detail" />
       <% end %>
+
+      <section class="agent-inline-cta detail-agent-cta">
+        <div>
+          <strong>Want help applying to roles like this?</strong>
+          <span>
+            Search Caio for free. If the repetitive CV tweaking gets heavy, Daniel can help set up Caio Agent.
+          </span>
+        </div>
+        <a
+          href="mailto:contact@caio-jobs.com?subject=Caio%20Agent%20setup"
+          class="secondary-button"
+          data-agent-cta="job_detail_agent"
+        >
+          Ask about Agent
+        </a>
+      </section>
     </section>
 
     <aside class="detail-sidebar">

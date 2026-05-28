@@ -74,7 +74,12 @@ module Standalone
       /\btechnology\b/i,
       /\bit\b/i,
       /\bdata science\b/i,
-      /\bengineering\b/i,
+      /\bsoftware engineering\b/i,
+      /\bproduct engineering\b/i,
+      /\bdata engineering\b/i,
+      /\bplatform engineering\b/i,
+      /\bweb engineering\b/i,
+      /\bsystems engineering\b/i,
       /\bproduct\b/i,
       /\bdesign\b/i,
       /\bdeveloper relations\b/i,
@@ -97,6 +102,7 @@ module Standalone
       /\bcarpenter\b/i,
       /\bmechanic\b/i,
       /\bdriver\b/i,
+      /\bdelivery driver\b/i,
       /\bwarehouse\b/i,
       /\bpicker\b/i,
       /\bpacker\b/i,
@@ -123,6 +129,10 @@ module Standalone
       /\bconstruction\b/i,
       /\bcivil engineer\b/i,
       /\bmechanical engineer\b/i,
+      /\bindustrial engineer\b/i,
+      /\bmechanical designer\b/i,
+      /\bcad designer\b/i,
+      /\bcad drafter\b/i,
       /\belectrical engineer\b/i,
       /\bmanufacturing engineer\b/i,
       /\bfield service engineer\b/i,
@@ -133,6 +143,8 @@ module Standalone
     ].freeze
 
     NON_TECH_CONTEXT_PATTERNS = [
+      /\bgeneral business\b/i,
+      /\brestaurants?\b/i,
       /\bconstruction\b/i,
       /\bfood service\b/i,
       /\bhealthcare\b/i,
@@ -141,14 +153,21 @@ module Standalone
       /\btransportation\b/i,
       /\blogistics\b/i,
       /\bmanufacturing\b/i,
+      /\bmechanical engineering\b/i,
+      /\bindustrial engineering\b/i,
+      /\bmechanical or industrial engineering\b/i,
+      /\bmechanical design\b/i,
+      /\bhvac\b/i,
+      /\bbuilding services\b/i,
+      /\benergy engineering\b/i,
+      /\bcad drafting\b/i,
       /\bmaintenance\b/i,
       /\bfacilities\b/i,
       /\bmedical\b/i,
       /\bnursing\b/i,
       /\beducation\b/i,
       /\baccounting\b/i,
-      /\blegal\b/i,
-      /\bgeneral business\b/i
+      /\blegal\b/i
     ].freeze
 
     def filter(source_name, jobs, classifier: nil)

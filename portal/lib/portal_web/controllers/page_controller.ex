@@ -22,6 +22,7 @@ defmodule PortalWeb.PageController do
       analytics_distinct_id: analytics_id(conn, lead),
       sample_jobs: sample_jobs,
       highlighted_companies: ["Stripe", "Figma", "GitHub", "Shopify", "Vercel"],
+      quick_searches: quick_searches(),
       total_jobs: total_jobs,
       lead: lead
     )
@@ -54,7 +55,11 @@ defmodule PortalWeb.PageController do
       "/pricing",
       "/privacy",
       "/terms",
-      "/status"
+      "/status",
+      "/hiring-now",
+      "/remote-tech-jobs",
+      "/startup-jobs",
+      "/top-skills"
     ]
 
     render_urlset(conn, Enum.map(urls, &%{loc: "https://caio-jobs.com#{&1}"}))
@@ -315,6 +320,70 @@ defmodule PortalWeb.PageController do
     redirect(conn, external: "https://github.com/danicuki/caio/commits/main")
   end
 
+  def hiring_now(conn, _params) do
+    render_acquisition(conn,
+      page_title: "Companies hiring now",
+      canonical_path: "/hiring-now",
+      eyebrow: "Hiring now",
+      title: "Companies with the most open tech roles on Caio.",
+      intro:
+        "A live-ish starting point for jobseekers who want to search by company instead of scrolling another generic job board.",
+      meta_description:
+        "See companies with the most open tech jobs indexed by Caio, then jump into focused company searches.",
+      kind: :companies,
+      items: Jobs.top_hiring_companies(30),
+      quick_searches: quick_searches()
+    )
+  end
+
+  def remote_tech_jobs(conn, _params) do
+    render_acquisition(conn,
+      page_title: "Remote tech jobs",
+      canonical_path: "/remote-tech-jobs",
+      eyebrow: "Remote tech jobs",
+      title: "Start with cleaner searches for remote tech roles.",
+      intro:
+        "Shareable searches for people who want remote software, data, product, and infrastructure roles without rebuilding the same filters every day.",
+      meta_description:
+        "Search remote software engineering, React, Python, AI, product, data, and DevOps jobs on Caio.",
+      kind: :searches,
+      items: remote_searches(),
+      quick_searches: quick_searches()
+    )
+  end
+
+  def startup_jobs(conn, _params) do
+    render_acquisition(conn,
+      page_title: "Startup jobs",
+      canonical_path: "/startup-jobs",
+      eyebrow: "Startup jobs",
+      title: "Search startup-flavored tech roles from one cleaner surface.",
+      intro:
+        "Useful entry points for startup, founding engineer, product, growth, and early-stage searches. Open the original posting when a role looks real.",
+      meta_description:
+        "Search startup engineering, founding engineer, product, growth, and remote startup jobs on Caio.",
+      kind: :searches,
+      items: startup_searches(),
+      quick_searches: quick_searches()
+    )
+  end
+
+  def top_skills(conn, _params) do
+    render_acquisition(conn,
+      page_title: "Top tech job skills",
+      canonical_path: "/top-skills",
+      eyebrow: "Top skills",
+      title: "Popular skills and categories in Caio's tech job index.",
+      intro:
+        "A quick way to jump from market signal into real searches. Pick a skill, compare open roles, and adjust from there.",
+      meta_description:
+        "Explore popular tech job skills and categories from Caio's job index with direct search links.",
+      kind: :keywords,
+      items: Jobs.top_search_keywords(36),
+      quick_searches: quick_searches()
+    )
+  end
+
   defp render_urlset(conn, urls) do
     body =
       [
@@ -375,6 +444,105 @@ defmodule PortalWeb.PageController do
       |> Keyword.put_new(:meta_description, Keyword.fetch!(assigns, :intro))
       |> Keyword.put_new(:canonical_path, Phoenix.Controller.current_path(conn))
     )
+  end
+
+  defp render_acquisition(conn, assigns) do
+    conn = ensure_session_token(conn)
+    lead = current_lead(conn)
+    page_title = Keyword.fetch!(assigns, :page_title)
+
+    Analytics.capture("acquisition_page_viewed", analytics_id(conn, lead), %{
+      page_title: page_title,
+      path: Phoenix.Controller.current_path(conn),
+      kind: assigns[:kind]
+    })
+
+    render(
+      conn,
+      :acquisition,
+      assigns
+      |> Keyword.put(:lead, lead)
+      |> Keyword.put(:analytics_distinct_id, analytics_id(conn, lead))
+      |> Keyword.put_new(:meta_description, Keyword.fetch!(assigns, :intro))
+    )
+  end
+
+  defp quick_searches do
+    [
+      %{
+        label: "Remote software engineer",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "software engineer", "location" => "remote", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-remote-software"})}"
+      },
+      %{
+        label: "React remote",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "react", "location" => "remote", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-react-remote"})}"
+      },
+      %{
+        label: "Python remote",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "python", "location" => "remote", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-python-remote"})}"
+      },
+      %{
+        label: "AI engineer",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "ai engineer", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-ai-engineer"})}"
+      },
+      %{
+        label: "Product manager",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "product manager", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-product-manager"})}"
+      },
+      %{
+        label: "Data analyst",
+        path:
+          "/jobs?#{URI.encode_query(%{"q" => "data analyst", "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "quick-data-analyst"})}"
+      }
+    ]
+  end
+
+  defp remote_searches do
+    [
+      search_card("Remote software engineer", %{
+        "q" => "software engineer",
+        "location" => "remote"
+      }),
+      search_card("Remote backend", %{"q" => "backend", "location" => "remote"}),
+      search_card("Remote frontend", %{"q" => "frontend", "location" => "remote"}),
+      search_card("Remote React", %{"q" => "react", "location" => "remote"}),
+      search_card("Remote Python", %{"q" => "python", "location" => "remote"}),
+      search_card("Remote AI engineer", %{"q" => "ai engineer", "location" => "remote"}),
+      search_card("Remote product manager", %{"q" => "product manager", "location" => "remote"}),
+      search_card("Remote data analyst", %{"q" => "data analyst", "location" => "remote"}),
+      search_card("Remote DevOps", %{"q" => "devops sre", "location" => "remote"})
+    ]
+  end
+
+  defp startup_searches do
+    [
+      search_card("Startup software engineer", %{"q" => "startup software engineer"}),
+      search_card("Founding engineer", %{"q" => "founding engineer"}),
+      search_card("Early stage backend", %{"q" => "early stage backend"}),
+      search_card("Startup product manager", %{"q" => "startup product manager"}),
+      search_card("Growth engineer", %{"q" => "growth engineer"}),
+      search_card("Remote startup roles", %{"q" => "startup", "location" => "remote"}),
+      search_card("AI startup jobs", %{"q" => "ai startup"}),
+      search_card("Fintech startup jobs", %{"q" => "fintech startup"})
+    ]
+  end
+
+  defp search_card(label, params) do
+    params =
+      params
+      |> Map.put("utm_source", "caio")
+      |> Map.put("utm_campaign", "launch-week")
+      |> Map.put(
+        "utm_content",
+        label |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.trim("-")
+      )
+
+    %{label: label, path: "/jobs?#{URI.encode_query(params)}"}
   end
 
   defp current_lead(conn), do: Accounts.get_lead(get_session(conn, :lead_id))

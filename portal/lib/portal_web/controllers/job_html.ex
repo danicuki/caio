@@ -373,6 +373,10 @@ defmodule PortalWeb.JobHTML do
 
         <nav class="footer-column" aria-label="Search">
           <h2>Search</h2>
+          <a href={~p"/hiring-now"}>Hiring now</a>
+          <a href={~p"/remote-tech-jobs"}>Remote tech jobs</a>
+          <a href={~p"/startup-jobs"}>Startup jobs</a>
+          <a href={~p"/top-skills"}>Top skills</a>
           <a href={~p"/jobs?role=frontend"}>Frontend</a>
           <a href={~p"/jobs?role=backend"}>Backend</a>
           <a href={~p"/jobs?q=machine+learning+data"}>ML & data</a>

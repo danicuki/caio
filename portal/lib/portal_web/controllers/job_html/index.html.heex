@@ -24,6 +24,21 @@
     </form>
   </section>
 
+  <section class="share-search-strip">
+    <div>
+      <strong>Found a useful search?</strong>
+      <span>Share this Caio URL with someone actively applying.</span>
+    </div>
+    <button
+      type="button"
+      class="secondary-button"
+      data-copy-search-url
+      data-share-label="search_results"
+    >
+      Copy search link
+    </button>
+  </section>
+
   <div class="mobile-filter-chips" aria-label="Quick filters">
     <span>Remote</span>
     <span>Salary listed</span>
@@ -160,6 +175,22 @@
           <% end %>
         </nav>
       <% end %>
+
+      <section class="agent-inline-cta">
+        <div>
+          <strong>Tired of applying manually?</strong>
+          <span>
+            Keep searching for free. If you want help applying, Daniel can set up Caio Agent with you.
+          </span>
+        </div>
+        <a
+          href="mailto:contact@caio-jobs.com?subject=Caio%20Agent%20setup"
+          class="secondary-button"
+          data-agent-cta="search_results_agent"
+        >
+          Ask about Agent
+        </a>
+      </section>
     </section>
 
     <aside class="preview-panel">

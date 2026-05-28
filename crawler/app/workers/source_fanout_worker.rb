@@ -28,7 +28,7 @@ class SourceFanoutWorker
   ].freeze
 
   SMARTRECRUITERS_COMPANIES = %w[
-    BoschGroup Canva DeliveryHero Dynatrace Freshworks Hootsuite NielsenIQ PublicisGroupe
+    Canva DeliveryHero Dynatrace Freshworks Hootsuite NielsenIQ PublicisGroupe
     SmartRecruiters Square Visa Wolt
   ].freeze
 

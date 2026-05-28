@@ -46,6 +46,35 @@ defmodule PortalWeb.PageControllerTest do
     assert html_response(conn, 200) =~ "Crawler and search status"
   end
 
+  test "GET acquisition pages", %{conn: conn} do
+    for {path, text} <- [
+          {"/hiring-now", "Companies with the most open tech roles on Caio."},
+          {"/remote-tech-jobs", "Start with cleaner searches for remote tech roles."},
+          {"/startup-jobs", "Search startup-flavored tech roles from one cleaner surface."},
+          {"/top-skills", "Popular skills and categories"}
+        ] do
+      conn = get(conn, path)
+      response = html_response(conn, 200)
+
+      assert response =~ text
+      assert response =~ "Shareable searches for active jobseekers"
+      assert response =~ "Ask Daniel about Agent"
+    end
+  end
+
+  test "GET /hiring-now excludes noisy non-tech companies", %{conn: conn} do
+    insert_company("boschgroup", "BoschGroup", 6_667)
+    insert_company("dominos", "DominoS", 5_846)
+    insert_company("google", "Google", 888)
+
+    conn = get(conn, ~p"/hiring-now")
+    response = html_response(conn, 200)
+
+    assert response =~ "Google"
+    refute response =~ "BoschGroup"
+    refute response =~ "DominoS"
+  end
+
   test "GET /changelog redirects to GitHub commit history", %{conn: conn} do
     conn = get(conn, ~p"/changelog")
     assert redirected_to(conn, 302) == "https://github.com/danicuki/caio/commits/main"
@@ -73,6 +102,10 @@ defmodule PortalWeb.PageControllerTest do
     assert response =~ "https://caio-jobs.com/"
     assert response =~ "https://caio-jobs.com/jobs"
     assert response =~ "https://caio-jobs.com/privacy"
+    assert response =~ "https://caio-jobs.com/hiring-now"
+    assert response =~ "https://caio-jobs.com/remote-tech-jobs"
+    assert response =~ "https://caio-jobs.com/startup-jobs"
+    assert response =~ "https://caio-jobs.com/top-skills"
   end
 
   test "GET /sitemap-companies.xml lists company pages", %{conn: conn} do
@@ -114,6 +147,19 @@ defmodule PortalWeb.PageControllerTest do
     assert response =~ "https://caio-jobs.com/jobs?q=Docker"
   end
 
+  test "GET /sitemap-keywords.xml excludes non-tech industry facets", %{conn: conn} do
+    insert_company_job("Caio Labs", %{category: "Mechanical Or Industrial Engineering"})
+    insert_company_job("Caio Tools", %{category: "Mechanical Or Industrial Engineering"})
+    insert_company_job("Caio Systems", %{category: "Mechanical Or Industrial Engineering"})
+    Portal.Jobs.refresh_sitemap_facets()
+
+    conn = get(conn, "/sitemap-keywords.xml")
+    response = response(conn, 200)
+
+    refute response =~ "Mechanical"
+    refute response =~ "Industrial"
+  end
+
   defp insert_company_job(company, attrs \\ %{}) do
     Portal.Repo.insert!(
       %Portal.Jobs.JobPost{
@@ -130,5 +176,22 @@ defmodule PortalWeb.PageControllerTest do
       }
       |> Map.merge(attrs)
     )
+  end
+
+  defp insert_company(id, name, open_jobs_count) do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    Portal.Repo.insert!(%Portal.Jobs.Company{
+      id: id,
+      name: name,
+      open_jobs_count: open_jobs_count,
+      source_count: 1,
+      location_count: 1,
+      remote_count: 0,
+      salary_count: 0,
+      latest_posted_at: Date.utc_today() |> Date.to_iso8601(),
+      created_at: now,
+      updated_at: now
+    })
   end
 end

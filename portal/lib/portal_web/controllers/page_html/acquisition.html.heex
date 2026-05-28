@@ -1,0 +1,120 @@
+<main class="site-shell acquisition-shell">
+  <PortalWeb.JobHTML.site_nav active="jobs" compact={true} lead={@lead} />
+
+  <section class="acquisition-hero">
+    <div>
+      <p class="eyebrow">{@eyebrow}</p>
+      <h1>{@title}</h1>
+      <p>{@intro}</p>
+    </div>
+    <aside class="acquisition-hero-card">
+      <strong>Search first.</strong>
+      <span>
+        Use Caio to find real roles. If the job hunt gets repetitive, the Agent offer
+        appears after signup.
+      </span>
+      <a href={~p"/jobs"} class="primary-button" data-acquisition-link="acquisition_search">
+        Search jobs
+      </a>
+    </aside>
+  </section>
+
+  <section class="quick-search-band" aria-label="Popular search links">
+    <div>
+      <span class="eyebrow">Fast starts</span>
+      <h2>Shareable searches for active jobseekers</h2>
+    </div>
+    <div class="quick-search-list">
+      <%= for search <- @quick_searches do %>
+        <a href={search.path} data-acquisition-link="quick_search">{search.label}</a>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="acquisition-grid">
+    <%= case @kind do %>
+      <% :companies -> %>
+        <%= for company <- @items do %>
+          <article class="acquisition-card">
+            <div class="acquisition-card-top">
+              <PortalWeb.JobHTML.company_avatar job={
+                %{company: company.name, company_logo_url: Map.get(company, :logo_url)}
+              } />
+              <span>
+                <strong>{company.name}</strong>
+                <small>{PortalWeb.JobHTML.pluralize(company.count, "open role")}</small>
+              </span>
+            </div>
+            <a
+              href={~p"/companies/#{company.slug}"}
+              class="secondary-button"
+              data-acquisition-link="company"
+            >
+              View company
+            </a>
+          </article>
+        <% end %>
+      <% :keywords -> %>
+        <%= for keyword <- @items do %>
+          <article class="acquisition-card">
+            <div>
+              <strong>{keyword.label}</strong>
+              <small>{PortalWeb.JobHTML.pluralize(keyword.count, "indexed role")}</small>
+            </div>
+            <a
+              href={"/jobs?#{URI.encode_query(%{"q" => keyword.label, "utm_source" => "caio", "utm_campaign" => "launch-week", "utm_content" => "top-skills"})}"}
+              class="secondary-button"
+              data-acquisition-link="keyword"
+            >
+              Search skill
+            </a>
+          </article>
+        <% end %>
+      <% _ -> %>
+        <%= for item <- @items do %>
+          <article class="acquisition-card">
+            <div>
+              <strong>{item.label}</strong>
+              <small>Open a focused Caio search</small>
+            </div>
+            <a href={item.path} class="secondary-button" data-acquisition-link="search">
+              Search now
+            </a>
+          </article>
+        <% end %>
+    <% end %>
+  </section>
+
+  <section class="agent-soft-cta">
+    <div>
+      <span class="eyebrow">Applying is the hard part</span>
+      <h2>When searching turns into busywork, Caio can help with the next step.</h2>
+      <p>
+        The portal stays free. The paid Agent offer is for people who want help
+        finding matches, adapting their CV, and applying consistently.
+      </p>
+    </div>
+    <a
+      href="mailto:contact@caio-jobs.com?subject=Caio%20Agent%20setup"
+      class="primary-button"
+      data-agent-cta="acquisition_agent"
+    >
+      Ask Daniel about Agent
+    </a>
+  </section>
+
+  <%= unless @lead do %>
+    <PortalWeb.JobHTML.profile_modal
+      id="unlock"
+      action={~p"/leads"}
+      return_to={Phoenix.Controller.current_path(@conn)}
+      params={%{}}
+      title="Unlock your"
+      accent="free profile."
+      body="Drop your email once to unlock the full index and keep your job-search signal."
+      submit_label="Unlock free profile"
+    />
+  <% end %>
+
+  <PortalWeb.JobHTML.footer />
+</main>

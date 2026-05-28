@@ -139,6 +139,7 @@ defmodule Portal.Jobs do
     rows =
       Company
       |> where([c], c.open_jobs_count > 0)
+      |> exclude_noisy_companies()
       |> order_by([c], desc: c.open_jobs_count, asc: c.name)
       |> limit(^limit)
       |> select([c], %{
@@ -158,6 +159,15 @@ defmodule Portal.Jobs do
 
   def sitemap_keywords(limit \\ @sitemap_url_limit) do
     sitemap_facets("keyword", limit)
+  end
+
+  def top_hiring_companies(limit \\ 24), do: sitemap_companies(limit)
+
+  def top_search_keywords(limit \\ 32) do
+    case sitemap_keywords(limit) do
+      [] -> sitemap_categories(limit)
+      keywords -> keywords
+    end
   end
 
   def refresh_sitemap_facets do
@@ -191,6 +201,7 @@ defmodule Portal.Jobs do
     |> Enum.map(fn [label, count, latest_posted_at] ->
       %{label: label, count: count, latest_posted_at: latest_posted_at}
     end)
+    |> reject_non_tech_facets()
   end
 
   defp refresh_sitemap_facet(facet, rows, now) do
@@ -919,11 +930,129 @@ defmodule Portal.Jobs do
   defp public_scope(query) do
     cutoff = public_cutoff_date()
 
-    where(
-      query,
+    query
+    |> where(
+      [j],
+      not fragment(
+        """
+        lower(coalesce(?, '')) LIKE '%mechanical engineer%'
+        OR lower(coalesce(?, '')) LIKE '%industrial engineer%'
+        OR lower(coalesce(?, '')) LIKE '%cad designer%'
+        OR lower(coalesce(?, '')) LIKE '%cad drafter%'
+        OR lower(coalesce(?, '')) LIKE '%mechanical engineering%'
+        OR lower(coalesce(?, '')) LIKE '%industrial engineering%'
+        OR lower(coalesce(?, '')) LIKE '%mechanical design%'
+        OR lower(coalesce(?, '')) LIKE '%hvac%'
+        OR lower(coalesce(?, '')) LIKE '%building services%'
+        OR lower(coalesce(?, '')) LIKE '%delivery driver%'
+        OR lower(coalesce(?, '')) LIKE '%customer service rep%'
+        OR lower(coalesce(?, '')) LIKE '%warehouse%'
+        OR lower(coalesce(?, '')) LIKE '%general business%'
+        OR lower(coalesce(?, '')) LIKE '%restaurants%'
+        """,
+        j.title,
+        j.title,
+        j.title,
+        j.title,
+        j.category,
+        j.category,
+        j.category,
+        j.category,
+        j.category,
+        j.title,
+        j.title,
+        j.title,
+        j.category,
+        j.tags_json
+      )
+    )
+    |> where(
       [j],
       is_nil(j.published_at) or j.published_at == "" or j.published_at >= ^cutoff
     )
+  end
+
+  defp exclude_noisy_companies(query) do
+    where(
+      query,
+      [c],
+      c.id not in ^noisy_company_ids() and
+        fragment("lower(trim(?))", c.name) not in ^noisy_company_names()
+    )
+  end
+
+  defp noisy_company_ids do
+    ~w(
+      boschgroup bosch-group dominos domino-s jobgether cityofnewyork
+      sgs jysk eurofins abbvie alten securitas redbull kreyco
+      insurance-office-of-america
+    )
+  end
+
+  defp noisy_company_names do
+    [
+      "boschgroup",
+      "bosch group",
+      "dominos",
+      "domino's",
+      "jobgether",
+      "cityofnewyork",
+      "city of new york",
+      "sgs",
+      "jysk",
+      "eurofins",
+      "abbvie",
+      "alten",
+      "securitas",
+      "redbull",
+      "red bull",
+      "kreyco",
+      "insurance office of america"
+    ]
+  end
+
+  defp reject_non_tech_facets(rows) do
+    Enum.reject(rows, fn %{label: label} -> non_tech_facet?(label) end)
+  end
+
+  defp non_tech_facet?(label) do
+    label =
+      label
+      |> to_string()
+      |> String.downcase()
+      |> String.replace(~r/[-_+]+/, " ")
+      |> String.replace(~r/\s+/, " ")
+      |> String.trim()
+
+    Enum.any?(non_tech_facet_phrases(), &String.contains?(label, &1))
+  end
+
+  defp non_tech_facet_phrases do
+    [
+      "mechanical or industrial engineering",
+      "mechanical engineering",
+      "industrial engineering",
+      "mechanical design",
+      "manufacturing",
+      "general business",
+      "restaurant",
+      "restaurants",
+      "hvac",
+      "building services",
+      "civil engineering",
+      "construction",
+      "retail",
+      "hospitality",
+      "food service",
+      "healthcare",
+      "nursing",
+      "legal",
+      "accounting",
+      "human resources",
+      "supply chain",
+      "warehouse",
+      "logistics"
+    ]
   end
 
   defp public_cutoff_date do
