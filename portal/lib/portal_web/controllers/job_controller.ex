@@ -11,6 +11,10 @@ defmodule PortalWeb.JobController do
     unlocked? = not is_nil(lead)
     jobs = Jobs.search(params, unlocked?)
     total = Jobs.count(params)
+    page = if(unlocked?, do: Jobs.page(params), else: 1)
+    per_page = Jobs.page_size(unlocked?)
+    has_prev_page? = unlocked? and page > 1
+    has_next_page? = unlocked? and next_page?(jobs, total, page, per_page)
 
     Analytics.capture("jobs_search_viewed", analytics_id(conn, lead), %{
       query: params["q"],
@@ -33,7 +37,13 @@ defmodule PortalWeb.JobController do
       total: total,
       lead: lead,
       unlocked?: unlocked?,
-      guest_limit: Jobs.guest_limit()
+      guest_limit: Jobs.guest_limit(),
+      page: page,
+      per_page: per_page,
+      has_prev_page?: has_prev_page?,
+      has_next_page?: has_next_page?,
+      prev_page_path: if(has_prev_page?, do: page_path(params, page - 1)),
+      next_page_path: if(has_next_page?, do: page_path(params, page + 1))
     )
   end
 
@@ -193,6 +203,23 @@ defmodule PortalWeb.JobController do
   end
 
   defp clean_param(_value), do: nil
+
+  defp next_page?(jobs, total, page, per_page) when is_integer(total) do
+    page * per_page < total and length(jobs) == per_page
+  end
+
+  defp next_page?(jobs, _total, _page, per_page), do: length(jobs) == per_page
+
+  defp page_path(params, page) do
+    query =
+      params
+      |> Map.drop(["_csrf_token"])
+      |> Map.put("page", Integer.to_string(page))
+      |> Enum.reject(fn {_key, value} -> is_nil(value) or value == "" end)
+      |> URI.encode_query()
+
+    if query == "", do: "/jobs", else: "/jobs?#{query}"
+  end
 
   defp sentence_case(value) do
     value

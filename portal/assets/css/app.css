@@ -603,6 +603,32 @@ button {
   background: var(--green-2);
 }
 
+.secondary-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  background: var(--paper-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.secondary-button:hover {
+  border-color: rgba(14, 92, 73, 0.42);
+  color: var(--green);
+}
+
+.secondary-button.disabled {
+  color: var(--muted);
+  background: transparent;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
 .privacy-note {
   margin: 14px 0 0;
   color: var(--muted);
@@ -1324,6 +1350,17 @@ button {
 
 .job-results {
   min-width: 0;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 22px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .job-card {

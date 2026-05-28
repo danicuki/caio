@@ -37,6 +37,8 @@ defmodule Portal.Jobs do
   ]
 
   def guest_limit, do: @guest_limit
+  def page_size(true), do: @member_limit
+  def page_size(false), do: @guest_preview
 
   def total_count do
     JobPost
@@ -46,16 +48,27 @@ defmodule Portal.Jobs do
   end
 
   def search(params, unlocked?) do
-    limit = if unlocked?, do: @member_limit, else: @guest_preview
+    limit = page_size(unlocked?)
+    offset = (if(unlocked?, do: page(params), else: 1) - 1) * limit
 
     JobPost
     |> public_scope()
     |> base_filters(params)
     |> apply_order(params)
+    |> offset(^offset)
     |> limit(^limit)
     |> select_list_fields()
     |> Repo.all()
   end
+
+  def page(%{"page" => value}) when is_binary(value) do
+    case Integer.parse(value) do
+      {page, ""} when page > 0 -> page
+      _ -> 1
+    end
+  end
+
+  def page(_params), do: 1
 
   def sample(limit \\ 6) do
     max_id =

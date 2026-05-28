@@ -119,7 +119,11 @@
       <div class="results-heading">
         <div>
           <h2>Best matches</h2>
-          <span>Guest preview shows {@guest_limit}; unlock for the deeper list.</span>
+          <%= if @unlocked? do %>
+            <span>Showing page {@page} · {@per_page} roles per page.</span>
+          <% else %>
+            <span>Guest preview shows {@guest_limit}; unlock for the deeper list.</span>
+          <% end %>
         </div>
         <span class="freshness-pill">Verified · live index</span>
       </div>
@@ -137,6 +141,24 @@
         <% else %>
           <.job_card job={job} locked />
         <% end %>
+      <% end %>
+
+      <%= if @unlocked? and @jobs != [] do %>
+        <nav class="pagination-bar" aria-label="Search result pages">
+          <%= if @has_prev_page? do %>
+            <a href={@prev_page_path} class="secondary-button">Previous</a>
+          <% else %>
+            <span class="secondary-button disabled">Previous</span>
+          <% end %>
+
+          <span>Page {@page}</span>
+
+          <%= if @has_next_page? do %>
+            <a href={@next_page_path} class="secondary-button">Next</a>
+          <% else %>
+            <span class="secondary-button disabled">Next</span>
+          <% end %>
+        </nav>
       <% end %>
     </section>
 
