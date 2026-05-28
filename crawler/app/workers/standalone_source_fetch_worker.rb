@@ -17,6 +17,8 @@ class StandaloneSourceFetchWorker
     case source_name
     when "arbeitnow_url"
       "arbeitnow"
+    when "himalayas_search"
+      "himalayas"
     else
       source_name
     end

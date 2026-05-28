@@ -1095,6 +1095,20 @@ module Standalone
       def html_description(value)
         value.to_s.strip
       end
+
+      def label_list(*values)
+        values.flatten.flat_map do |value|
+          value.to_s.split(/\s*,\s*/)
+        end.map { |value| human_label(value) }.reject(&:empty?).uniq
+      end
+
+      def human_label(value)
+        value.to_s
+          .tr("-", " ")
+          .gsub(/\s*&\s*/, " & ")
+          .gsub(/\s+/, " ")
+          .strip
+      end
     end
 
     class Remotive < Base
@@ -1479,6 +1493,7 @@ module Standalone
         jobs.map do |job|
           salary = [job["currency"], job["minSalary"], job["maxSalary"]].compact.join(" ")
           locations = Array(job["locationRestrictions"]).map { |location| location["name"] }
+          categories = label_list(job["categories"])
           {
             source_key: job.fetch("guid").to_s,
             title: job.fetch("title"),
@@ -1486,11 +1501,11 @@ module Standalone
             location: locations.empty? ? "Worldwide" : locations.join(", "),
             remote: true,
             employment_type: job["employmentType"],
-            category: Array(job["categories"]).join(", "),
+            category: categories.first,
             salary: salary.empty? ? nil : salary,
             source_url: job.fetch("applicationLink"),
             published_at: parse_time(job["pubDate"]),
-            tags: Array(job["parentCategories"]) + Array(job["seniority"]),
+            tags: label_list(categories, job["parentCategories"], job["seniority"]),
             description: html_description(job["description"]),
             raw: job
           }
@@ -1607,6 +1622,7 @@ module Standalone
         jobs.map do |job|
           salary = [job["currency"], job["minSalary"], job["maxSalary"]].compact.join(" ")
           locations = Array(job["locationRestrictions"]).map { |location| location.is_a?(Hash) ? location["name"] : location.to_s }
+          categories = label_list(job["categories"])
           {
             source_key: job.fetch("guid").to_s,
             title: job.fetch("title"),
@@ -1614,11 +1630,11 @@ module Standalone
             location: locations.empty? ? "Worldwide" : locations.join(", "),
             remote: job.to_s.match?(/remote/i) || locations.any? { |location| location.match?(/remote/i) } ? true : nil,
             employment_type: job["employmentType"],
-            category: Array(job["categories"]).join(", "),
+            category: categories.first,
             salary: salary.empty? ? nil : salary,
             source_url: job.fetch("applicationLink"),
             published_at: parse_time(job["pubDate"]),
-            tags: Array(job["parentCategories"]) + Array(job["seniority"]),
+            tags: label_list(categories, job["parentCategories"], job["seniority"]),
             description: html_description(job["description"] || job["excerpt"]),
             raw: job
           }

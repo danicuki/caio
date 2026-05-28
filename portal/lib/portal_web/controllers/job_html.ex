@@ -433,6 +433,7 @@ defmodule PortalWeb.JobHTML do
     end
   end
 
+  def source_label(source) when source in ["himalayas", "himalayas_search"], do: "Himalayas"
   def source_label(source), do: source |> to_string() |> String.capitalize()
 
   def employment_label(%{employment_type: value}) when value not in [nil, ""],
@@ -463,6 +464,8 @@ defmodule PortalWeb.JobHTML do
     (parsed_tags(job) ++ [job.category, source_label(job.source)])
     |> Enum.reject(&is_nil_or_empty?/1)
     |> Enum.map(&tag_label/1)
+    |> Enum.flat_map(&split_tag_label/1)
+    |> Enum.map(&humanize_tag_label/1)
     |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
   end
@@ -482,6 +485,13 @@ defmodule PortalWeb.JobHTML do
   defp tag_label(value) when is_binary(value), do: String.trim(value)
   defp tag_label(value), do: value |> inspect() |> String.trim()
 
+  defp split_tag_label(value) do
+    value
+    |> to_string()
+    |> String.split(~r/\s*,\s*/, trim: true)
+    |> Enum.map(&String.trim/1)
+  end
+
   def company_initials(job) do
     source = source_label(Map.get(job, :source))
 
@@ -494,6 +504,15 @@ defmodule PortalWeb.JobHTML do
       "" -> "C"
       value -> value
     end
+  end
+
+  defp humanize_tag_label(value) do
+    value
+    |> to_string()
+    |> String.replace("-", " ")
+    |> String.replace(~r/\s*&\s*/, " & ")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
   end
 
   def company_logo_url(job) do
