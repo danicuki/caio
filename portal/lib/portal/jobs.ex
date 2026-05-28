@@ -11,6 +11,9 @@ defmodule Portal.Jobs do
   @member_limit 50
   @sitemap_url_limit 50_000
   @sitemap_refresh_opts [timeout: :infinity]
+  @home_cache_table :portal_home_jobs_cache
+  @home_cache_key :snapshot
+  @home_cache_ttl_ms 120_000
   @list_fields [
     :id,
     :source,
@@ -39,6 +42,22 @@ defmodule Portal.Jobs do
   def guest_limit, do: @guest_limit
   def page_size(true), do: @member_limit
   def page_size(false), do: @guest_preview
+
+  def home_snapshot(limit \\ 6) do
+    case cached_home_snapshot() do
+      {:ok, snapshot} ->
+        snapshot
+
+      :miss ->
+        snapshot = %{
+          total_count: homepage_total_count(),
+          sample_jobs: homepage_sample(limit)
+        }
+
+        put_cached_home_snapshot(snapshot)
+        snapshot
+    end
+  end
 
   def total_count do
     JobPost
@@ -87,6 +106,30 @@ defmodule Portal.Jobs do
       |> Enum.take(limit)
       |> fill_sample(limit)
     end
+  end
+
+  def homepage_total_count do
+    company_total =
+      Company
+      |> where([c], c.open_jobs_count > 0)
+      |> exclude_noisy_companies()
+      |> select([c], sum(c.open_jobs_count))
+      |> Repo.one()
+
+    if company_total && company_total > 0 do
+      company_total
+    else
+      total_count()
+    end
+  end
+
+  def homepage_sample(limit \\ 6) do
+    JobPost
+    |> public_scope()
+    |> order_by([j], desc: j.id)
+    |> limit(^limit)
+    |> select_list_fields()
+    |> Repo.all()
   end
 
   def count(params) do
@@ -1228,5 +1271,38 @@ defmodule Portal.Jobs do
       is_nil(columns) -> terms
       true -> "#{columns}: #{terms}"
     end
+  end
+
+  defp cached_home_snapshot do
+    ensure_home_cache_table()
+    now = System.monotonic_time(:millisecond)
+
+    case :ets.lookup(@home_cache_table, @home_cache_key) do
+      [{@home_cache_key, timestamp, snapshot}] when now - timestamp < @home_cache_ttl_ms ->
+        {:ok, snapshot}
+
+      _ ->
+        :miss
+    end
+  end
+
+  defp put_cached_home_snapshot(snapshot) do
+    ensure_home_cache_table()
+
+    :ets.insert(
+      @home_cache_table,
+      {@home_cache_key, System.monotonic_time(:millisecond), snapshot}
+    )
+  end
+
+  defp ensure_home_cache_table do
+    :ets.new(@home_cache_table, [
+      :named_table,
+      :public,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
+  rescue
+    ArgumentError -> :ok
   end
 end

@@ -5,8 +5,7 @@ defmodule PortalWeb.PageController do
 
   def home(conn, _params) do
     conn = ensure_session_token(conn)
-    sample_jobs = Jobs.sample(6)
-    total_jobs = Jobs.total_count()
+    %{sample_jobs: sample_jobs, total_count: total_jobs} = Jobs.home_snapshot(6)
     lead = current_lead(conn)
 
     Analytics.capture("home_viewed", analytics_id(conn, lead), %{
