@@ -88,6 +88,7 @@ defmodule PortalWeb.PageControllerTest do
   test "GET /sitemap-locations.xml lists city search pages", %{conn: conn} do
     insert_company_job("Caio Labs", %{location_city: "Lisbon"})
     insert_company_job("Caio Tools", %{location_city: "Lisbon"})
+    Portal.Jobs.refresh_sitemap_facets()
 
     conn = get(conn, "/sitemap-locations.xml")
     response = response(conn, 200)
@@ -95,10 +96,17 @@ defmodule PortalWeb.PageControllerTest do
     assert response =~ "https://caio-jobs.com/jobs?location=Lisbon"
   end
 
+  test "GET /sitemap-location.xml redirects to plural locations sitemap", %{conn: conn} do
+    conn = get(conn, "/sitemap-location.xml")
+
+    assert redirected_to(conn, 301) == "/sitemap-locations.xml"
+  end
+
   test "GET /sitemap-keywords.xml lists keyword search pages", %{conn: conn} do
     insert_company_job("Caio Labs", %{category: "Docker"})
     insert_company_job("Caio Tools", %{category: "Docker"})
     insert_company_job("Caio Systems", %{category: "Docker"})
+    Portal.Jobs.refresh_sitemap_facets()
 
     conn = get(conn, "/sitemap-keywords.xml")
     response = response(conn, 200)

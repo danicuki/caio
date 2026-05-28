@@ -9,6 +9,7 @@ defmodule Portal.Jobs do
   @guest_limit 10
   @guest_preview 18
   @member_limit 50
+  @sitemap_url_limit 50_000
   @list_fields [
     :id,
     :source,
@@ -137,7 +138,64 @@ defmodule Portal.Jobs do
     if rows == [], do: legacy_sitemap_companies(limit), else: rows
   end
 
-  def sitemap_locations(limit \\ 5_000) do
+  def sitemap_locations(limit \\ @sitemap_url_limit) do
+    sitemap_facets("location", limit)
+  end
+
+  def sitemap_keywords(limit \\ @sitemap_url_limit) do
+    sitemap_facets("keyword", limit)
+  end
+
+  def refresh_sitemap_facets do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    locations = location_sitemap_rows()
+    keywords = keyword_sitemap_rows()
+
+    Repo.transaction(fn ->
+      refresh_sitemap_facet("location", locations, now)
+      refresh_sitemap_facet("keyword", keywords, now)
+    end)
+
+    %{locations: length(locations), keywords: length(keywords)}
+  end
+
+  defp sitemap_facets(facet, limit) do
+    Repo.query!(
+      """
+      SELECT label, jobs_count, latest_posted_at
+      FROM sitemap_facets
+      WHERE facet = ?
+      ORDER BY jobs_count DESC, label ASC
+      LIMIT ?
+      """,
+      [facet, limit]
+    )
+    |> Map.fetch!(:rows)
+    |> Enum.map(fn [label, count, latest_posted_at] ->
+      %{label: label, count: count, latest_posted_at: latest_posted_at}
+    end)
+  end
+
+  defp refresh_sitemap_facet(facet, rows, now) do
+    Repo.query!("DELETE FROM sitemap_facets WHERE facet = ?", [facet])
+
+    rows
+    |> Enum.map(fn %{label: label, count: count, latest_posted_at: latest_posted_at} ->
+      %{
+        facet: facet,
+        label: label,
+        jobs_count: count,
+        latest_posted_at: latest_posted_at,
+        refreshed_at: now
+      }
+    end)
+    |> Enum.chunk_every(500)
+    |> Enum.each(fn chunk ->
+      Repo.insert_all("sitemap_facets", chunk)
+    end)
+  end
+
+  defp location_sitemap_rows(limit \\ @sitemap_url_limit) do
     Repo.query!(
       """
       SELECT
@@ -161,7 +219,7 @@ defmodule Portal.Jobs do
     end)
   end
 
-  def sitemap_keywords(limit \\ 5_000) do
+  defp keyword_sitemap_rows(limit \\ @sitemap_url_limit) do
     Repo.query!(
       """
       SELECT

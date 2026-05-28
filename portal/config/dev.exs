@@ -5,6 +5,7 @@ config :portal, Portal.Repo,
   database: Path.expand("../../crawler/db/development.sqlite3", __DIR__),
   migration_source: "portal_schema_migrations",
   pool_size: 5,
+  busy_timeout: 15_000,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 

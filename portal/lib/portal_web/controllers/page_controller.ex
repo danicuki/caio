@@ -73,6 +73,12 @@ defmodule PortalWeb.PageController do
     render_urlset(conn, urls)
   end
 
+  def sitemap_location_redirect(conn, _params) do
+    conn
+    |> put_status(:moved_permanently)
+    |> redirect(to: ~p"/sitemap-locations.xml")
+  end
+
   def sitemap_locations(conn, _params) do
     urls =
       Jobs.sitemap_locations()
