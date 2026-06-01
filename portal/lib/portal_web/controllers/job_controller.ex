@@ -252,46 +252,126 @@ defmodule PortalWeb.JobController do
   end
 
   defp job_json_ld(job) do
-    %{
-      "@context" => "https://schema.org",
-      "@type" => "JobPosting",
-      "title" => job.title,
-      "description" => PortalWeb.JobHTML.clean_description(job.description),
-      "datePosted" => published_date(job),
-      "employmentType" => job.employment_type,
-      "hiringOrganization" => %{
-        "@type" => "Organization",
-        "name" => job.company || "Company",
-        "logo" => PortalWeb.JobHTML.company_logo_url(job),
-        "sameAs" => PortalWeb.PageHTML.absolute_url(Jobs.company_path(job))
-      },
-      "jobLocationType" => if(PortalWeb.JobHTML.remote_label(job), do: "TELECOMMUTE", else: nil),
-      "jobLocation" => job_location_json_ld(job),
-      "baseSalary" => salary_json_ld(job),
-      "url" => PortalWeb.PageHTML.absolute_url("/jobs/#{job.id}")
-    }
-    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
-    |> Map.new()
+    job_location = job_location_json_ld(job)
+    applicant_location_requirements = applicant_location_requirements_json_ld(job)
+
+    if fresh_for_job_markup?(job) && (job_location || applicant_location_requirements) do
+      %{
+        "@context" => "https://schema.org",
+        "@type" => "JobPosting",
+        "title" => job.title,
+        "description" => PortalWeb.JobHTML.clean_description(job.description),
+        "datePosted" => published_date(job),
+        "employmentType" => job.employment_type,
+        "hiringOrganization" => %{
+          "@type" => "Organization",
+          "name" => job.company || "Company",
+          "logo" => PortalWeb.JobHTML.company_logo_url(job),
+          "sameAs" => PortalWeb.PageHTML.absolute_url(Jobs.company_path(job))
+        },
+        "jobLocationType" => if(PortalWeb.JobHTML.remote_label(job), do: "TELECOMMUTE", else: nil),
+        "jobLocation" => job_location,
+        "applicantLocationRequirements" => applicant_location_requirements,
+        "baseSalary" => salary_json_ld(job),
+        "validThrough" => valid_through(job),
+        "url" => PortalWeb.PageHTML.absolute_url("/jobs/#{job.id}")
+      }
+      |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+      |> Map.new()
+    end
   end
 
-  defp published_date(%{published_at: value}) when value not in [nil, ""],
-    do: String.slice(value, 0, 10)
+  defp fresh_for_job_markup?(job) do
+    case Date.from_iso8601(published_date(job)) do
+      {:ok, date} -> Date.diff(Date.utc_today(), date) <= 90
+      _ -> false
+    end
+  end
 
-  defp published_date(_job), do: nil
+  defp published_date(job) do
+    [Map.get(job, :published_at), Map.get(job, :created_at), Map.get(job, :updated_at)]
+    |> Enum.find_value(&iso_date/1)
+    |> case do
+      nil -> Date.utc_today() |> Date.to_iso8601()
+      date -> date
+    end
+  end
 
-  defp job_location_json_ld(%{location_city: city, location_country: country})
-       when city not in [nil, ""] or country not in [nil, ""] do
+  defp iso_date(value) when value in [nil, ""], do: nil
+
+  defp iso_date(value) do
+    value
+    |> to_string()
+    |> String.slice(0, 10)
+    |> Date.from_iso8601()
+    |> case do
+      {:ok, date} -> Date.to_iso8601(date)
+      _ -> nil
+    end
+  end
+
+  defp valid_through(job) do
+    job
+    |> published_date()
+    |> Date.from_iso8601()
+    |> case do
+      {:ok, date} ->
+        date
+        |> Date.add(90)
+        |> DateTime.new!(~T[23:59:59], "Etc/UTC")
+        |> DateTime.to_iso8601()
+
+      _ ->
+        nil
+    end
+  end
+
+  defp job_location_json_ld(%{location_country: country} = job) when country not in [nil, ""] do
     %{
       "@type" => "Place",
       "address" => %{
         "@type" => "PostalAddress",
-        "addressLocality" => city,
+        "addressLocality" => Map.get(job, :location_city),
+        "addressRegion" => location_region(job),
         "addressCountry" => country
       }
+      |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+      |> Map.new()
     }
   end
 
   defp job_location_json_ld(_job), do: nil
+
+  defp applicant_location_requirements_json_ld(job) do
+    if PortalWeb.JobHTML.remote_label(job) do
+      country = applicant_country(job)
+
+      if country do
+        %{
+          "@type" => "Country",
+          "name" => country
+        }
+      end
+    end
+  end
+
+  defp applicant_country(%{location_country: country}) when country not in [nil, ""], do: country
+
+  defp applicant_country(%{location: location}) when location not in [nil, ""] do
+    cond do
+      String.contains?(String.downcase(location), ["united states", " usa", "us only"]) -> "US"
+      String.contains?(String.downcase(location), ["brazil", "brasil"]) -> "BR"
+      String.contains?(String.downcase(location), "canada") -> "CA"
+      String.contains?(String.downcase(location), ["united kingdom", " uk"]) -> "GB"
+      String.contains?(String.downcase(location), ["europe", "emea"]) -> "EU"
+      true -> "Worldwide"
+    end
+  end
+
+  defp applicant_country(_job), do: "Worldwide"
+
+  defp location_region(%{location_state: state}) when state not in [nil, ""], do: state
+  defp location_region(_job), do: nil
 
   defp salary_json_ld(%{salary_min: min, salary_max: max, salary_currency: currency})
        when not is_nil(min) or not is_nil(max) do

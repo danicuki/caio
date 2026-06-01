@@ -35,15 +35,53 @@ defmodule PortalWeb.JobControllerTest do
   end
 
   test "GET /jobs/:id includes JobPosting structured data", %{conn: conn} do
-    job = job_fixture()
+    job = job_fixture(%{remote: 1})
 
     conn = get(conn, ~p"/jobs/#{job.id}")
     response = html_response(conn, 200)
 
     assert response =~ ~s(<script type="application/ld+json">)
     assert response =~ ~s("JobPosting")
+    assert response =~ ~s("datePosted")
+    assert response =~ ~s("validThrough")
+    assert response =~ ~s("jobLocationType":"TELECOMMUTE")
+    assert response =~ ~s("applicantLocationRequirements")
     assert response =~ "Senior Elixir Engineer"
     assert response =~ "Caio Labs"
+  end
+
+  test "GET /jobs/:id falls back to created_at for JobPosting datePosted", %{conn: conn} do
+    job =
+      job_fixture(%{
+        published_at: nil,
+        created_at: "2026-05-15T12:00:00Z",
+        location_country: "US"
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    assert response =~ ~s("datePosted":"2026-05-15")
+    assert response =~ ~s("validThrough":"2026-08-13T23:59:59Z")
+    assert response =~ ~s("jobLocation")
+    assert response =~ ~s("addressCountry":"US")
+  end
+
+  test "GET /jobs/:id omits JobPosting structured data without a usable location", %{conn: conn} do
+    job =
+      job_fixture(%{
+        location: "",
+        remote: 0,
+        location_scope: nil,
+        location_city: nil,
+        location_country: nil
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}")
+    response = html_response(conn, 200)
+
+    refute response =~ ~s("JobPosting")
+    refute response =~ ~s("datePosted")
   end
 
   test "GET /jobs/:id preserves structured job description HTML", %{conn: conn} do
