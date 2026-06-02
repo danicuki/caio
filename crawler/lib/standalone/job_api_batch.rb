@@ -177,6 +177,7 @@ module Standalone
       db.busy_timeout = Integer(ENV.fetch("SQLITE_BUSY_TIMEOUT_MS", "15000"))
       db.execute("PRAGMA journal_mode = WAL")
       db.execute("PRAGMA synchronous = NORMAL")
+      skipped_count = 0
 
       sql = <<~SQL
         INSERT INTO job_posts (
@@ -266,6 +267,7 @@ module Standalone
       with_sqlite_busy_retry do
         transaction_inserted_count = 0
         transaction_updated_count = 0
+        transaction_skipped_count = 0
 
         db.transaction do
           statement = db.prepare(sql)
@@ -277,8 +279,40 @@ module Standalone
             tags_json = JSON.generate(job[:tags] || [])
             raw_json = JSON.generate(job[:raw])
             company_id = company_slug(job[:company])
+            incoming = materialized_job_attributes(
+              source: source_name,
+              source_key: source_key,
+              title: job.fetch(:title),
+              company: job[:company],
+              company_id: company_id,
+              location: job[:location],
+              remote: native_boolean(job[:remote]),
+              employment_type: job[:employment_type],
+              category: job[:category],
+              salary: job[:salary],
+              source_url: source_url,
+              published_at: job[:published_at],
+              tags_json: tags_json,
+              description: job[:description],
+              raw_json: raw_json,
+              salary_min: normalized[:salary_min],
+              salary_max: normalized[:salary_max],
+              salary_currency: normalized[:salary_currency],
+              salary_period: normalized[:salary_period],
+              location_city: normalized[:location_city],
+              location_state: normalized[:location_state],
+              location_country: normalized[:location_country],
+              location_continent: normalized[:location_continent],
+              location_scope: normalized[:location_scope]
+            )
+            existing = existing_job_row(db, source_name, source_key, source_url)
 
-            if duplicate_url_for_other_key?(db, source_url, source_name, source_key)
+            if existing && unchanged_job?(existing, incoming)
+              transaction_skipped_count += 1
+              next
+            end
+
+            if existing && existing["source_url"].to_s == source_url.to_s && (existing["source"].to_s != source_name.to_s || existing["source_key"].to_s != source_key.to_s)
               transaction_updated_count += 1
               update_by_url_statement.execute(
                 job.fetch(:title),
@@ -306,7 +340,7 @@ module Standalone
                 source_url
               )
             else
-              if existing_job?(db, source_name, source_key, source_url)
+              if existing
                 transaction_updated_count += 1
               else
                 transaction_inserted_count += 1
@@ -346,13 +380,14 @@ module Standalone
 
         inserted_count = transaction_inserted_count
         updated_count = transaction_updated_count
+        skipped_count = transaction_skipped_count
       end
       ImportStats.new(
         fetched_count: jobs.size,
         imported_count: jobs.size,
         inserted_count: inserted_count,
         updated_count: updated_count,
-        skipped_count: 0
+        skipped_count: skipped_count
       )
     ensure
       begin
@@ -607,24 +642,51 @@ module Standalone
       slug.empty? ? nil : slug
     end
 
-    def duplicate_url_for_other_key?(db, source_url, source_name, source_key)
-      return false if source_url.to_s.empty?
-
-      db.get_first_value(
-        "SELECT 1 FROM job_posts WHERE source_url = ? AND NOT (source = ? AND source_key = ?) LIMIT 1",
-        source_url,
-        source_name,
-        source_key
-      ) == 1
+    def existing_job_row(db, source_name, source_key, source_url)
+      db.results_as_hash = true
+      db.get_first_row(
+        <<~SQL,
+          SELECT
+            source, source_key, title, company, company_id, location, remote, employment_type,
+            category, salary, source_url, published_at, tags_json, description, raw_json,
+            salary_min, salary_max, salary_currency, salary_period,
+            location_city, location_state, location_country, location_continent, location_scope
+          FROM job_posts
+          WHERE (source = ? AND source_key = ?) OR source_url = ?
+          ORDER BY CASE WHEN source = ? AND source_key = ? THEN 0 ELSE 1 END
+          LIMIT 1
+        SQL
+        [source_name, source_key, source_url, source_name, source_key]
+      )
     end
 
-    def existing_job?(db, source_name, source_key, source_url)
-      db.get_first_value(
-        "SELECT 1 FROM job_posts WHERE (source = ? AND source_key = ?) OR source_url = ? LIMIT 1",
-        source_name,
-        source_key,
-        source_url
-      ) == 1
+    def materialized_job_attributes(attrs)
+      attrs
+    end
+
+    def unchanged_job?(existing, incoming)
+      incoming.all? do |field, value|
+        existing_value = existing[field.to_s]
+        effective_value = if %i[description raw_json].include?(field) && blank?(value)
+          existing_value
+        else
+          value
+        end
+
+        comparable_value(existing_value) == comparable_value(effective_value)
+      end
+    end
+
+    def comparable_value(value)
+      return "" if value.nil?
+      return value.to_f if value.is_a?(Float)
+      return value.to_i if value.is_a?(Integer)
+
+      value.to_s
+    end
+
+    def blank?(value)
+      value.nil? || value == ""
     end
 
     def with_sqlite_busy_retry

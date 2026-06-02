@@ -1,4 +1,6 @@
 require Rails.root.join("lib/standalone/job_api_batch")
+require "digest"
+require "json"
 require "set"
 
 class SourceFanoutWorker
@@ -46,6 +48,10 @@ class SourceFanoutWorker
   GETONBRD_QUERIES = Standalone::Sources::GetOnBoard::QUERIES.freeze
 
   def perform
+    @enqueued_count = 0
+    @fanout_budget = Integer(ENV.fetch("SOURCE_FETCH_MAX_ENQUEUE_PER_FANOUT", "500"))
+    @fanout_budget_warning_emitted = false
+
     enqueue_static_sources
     enqueue_jobicy
     enqueue_web3career
@@ -227,7 +233,11 @@ class SourceFanoutWorker
   end
 
   def enqueue_source(source, params)
+    return if fanout_budget_exhausted?
+    return unless fetch_target_due?(source, params)
+
     StandaloneSourceFetchWorker.perform_async(source, params)
+    @enqueued_count += 1
   end
 
   def source_yield_allowed?(source)
@@ -238,7 +248,7 @@ class SourceFanoutWorker
 
     lookback_hours = Integer(ENV.fetch("CRAWLER_YIELD_LOOKBACK_HOURS", "6"))
     min_imported = Integer(ENV.fetch("CRAWLER_YIELD_MIN_IMPORTED", "10000"))
-    min_new_per_1k = Float(ENV.fetch("CRAWLER_YIELD_MIN_NEW_PER_1K", "1.0"))
+    min_new_per_1k = Float(ENV.fetch("CRAWLER_YIELD_MIN_NEW_PER_1K", "2.0"))
     cutoff = lookback_hours.hours.ago
     runs = SourceRun.where(source: source).where("created_at >= ?", cutoff)
     imported = runs.sum(:imported_count).to_i
@@ -256,6 +266,40 @@ class SourceFanoutWorker
 
     warn "yield gate skipped source=#{source} imported=#{imported} lookback_hours=#{lookback_hours}" unless allowed
     @source_yield_allowed[source] = allowed
+  end
+
+  def fanout_budget_exhausted?
+    exhausted = @enqueued_count.to_i >= @fanout_budget.to_i
+    if exhausted && !@fanout_budget_warning_emitted
+      warn "source fanout budget exhausted enqueued=#{@enqueued_count} budget=#{@fanout_budget}"
+      @fanout_budget_warning_emitted = true
+    end
+    exhausted
+  end
+
+  def fetch_target_due?(source, params)
+    cooldown_seconds = Integer(ENV.fetch("CRAWLER_FETCH_TARGET_COOLDOWN_SECONDS", "14400"))
+    return true if cooldown_seconds <= 0
+
+    key = fetch_target_key(source, params)
+    state = SourceState.find_or_initialize_by(source: key)
+
+    if state.persisted? && state.updated_at && state.updated_at > cooldown_seconds.seconds.ago
+      return false
+    end
+
+    state.next_cursor = nil
+    state.exhausted = false
+    state.last_error = nil
+    state.updated_at = Time.current
+    state.save!
+    true
+  end
+
+  def fetch_target_key(source, params)
+    normalized_params = params.to_h.transform_keys(&:to_s).sort.to_h
+    digest = Digest::SHA256.hexdigest(JSON.generate(normalized_params))[0, 24]
+    "fetch_target:#{source}:#{digest}"
   end
 
   def company_name_candidates

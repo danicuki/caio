@@ -6,8 +6,8 @@ class SourceFanoutSchedulerWorker
   sidekiq_options queue: :control, retry: false
 
   def perform
-    target_depth = Integer(ENV.fetch("SOURCE_FETCH_TARGET_QUEUE_DEPTH", "500"))
-    detail_target_depth = Integer(ENV.fetch("WEB3CAREER_DETAIL_TARGET_QUEUE_DEPTH", "300"))
+    target_depth = Integer(ENV.fetch("SOURCE_FETCH_TARGET_QUEUE_DEPTH", "250"))
+    detail_target_depth = Integer(ENV.fetch("WEB3CAREER_DETAIL_TARGET_QUEUE_DEPTH", "100"))
     current_depth = Sidekiq::Queue.new("source_fetchers").size
     detail_depth = Sidekiq::Queue.new("web3_details").size
 
