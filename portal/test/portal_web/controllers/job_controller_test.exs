@@ -116,6 +116,53 @@ defmodule PortalWeb.JobControllerTest do
     refute response =~ "Protocol.UndefinedError"
   end
 
+  test "GET /jobs orders newest results by published date", %{conn: conn} do
+    older =
+      job_fixture(%{
+        title: "Older Backend Engineer",
+        published_at: "2026-05-01",
+        created_at: "2026-06-01T12:00:00Z"
+      })
+
+    newer =
+      job_fixture(%{
+        title: "Newer Backend Engineer",
+        published_at: "2026-06-01",
+        created_at: "2026-05-01T12:00:00Z"
+      })
+
+    conn = get(conn, ~p"/jobs?order=recent")
+    response = html_response(conn, 200)
+
+    assert response =~ newer.title
+    assert response =~ older.title
+    assert String.split(response, newer.title, parts: 2) |> List.last() =~ older.title
+  end
+
+  test "GET /jobs renders prototype chips as real filter links", %{conn: conn} do
+    conn = get(conn, ~p"/jobs")
+    response = html_response(conn, 200)
+
+    assert response =~ ~s(href="/jobs?workplace=remote")
+    assert response =~ ~s(href="/jobs?seniority=senior")
+    assert response =~ ~s(href="/jobs?salary=listed")
+    assert response =~ ~s(href="/jobs?role=engineer")
+  end
+
+  test "GET /jobs supports quick filter params", %{conn: conn} do
+    job_fixture(%{title: "Senior Backend Engineer", remote: 1, salary: "$100k"})
+
+    for path <- [
+          ~p"/jobs?seniority=senior",
+          ~p"/jobs?workplace=remote",
+          ~p"/jobs?salary=listed",
+          ~p"/jobs?perk=visa"
+        ] do
+      conn = get(conn, path)
+      assert html_response(conn, 200) =~ "Best matches"
+    end
+  end
+
   test "GET /jobs hides obvious non-tech engineering roles", %{conn: conn} do
     job_fixture(%{
       title: "Mechanical Engineer",

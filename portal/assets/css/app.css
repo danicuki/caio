@@ -786,7 +786,7 @@ button {
 }
 
 .map-stats span,
-.mobile-filter-chips span,
+.mobile-filter-chips a,
 .tag-chip,
 .freshness-pill {
   display: inline-flex;
@@ -801,6 +801,16 @@ button {
   font-size: 12px;
   font-weight: 550;
   white-space: nowrap;
+}
+
+.mobile-filter-chips a {
+  text-decoration: none;
+}
+
+.mobile-filter-chips a.active {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-soft);
 }
 
 .mini-list {
@@ -1119,7 +1129,7 @@ button {
   font-size: 13px;
 }
 
-.mock-filters span {
+.mock-filters a {
   display: inline-flex;
   min-height: 24px;
   align-items: center;
@@ -1129,6 +1139,13 @@ button {
   color: var(--muted);
   background: var(--paper);
   font-size: 11px;
+  text-decoration: none;
+}
+
+.mock-filters a.active {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-soft);
 }
 
 .unlock-box {

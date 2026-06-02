@@ -43,7 +43,9 @@ defmodule PortalWeb.JobController do
       has_prev_page?: has_prev_page?,
       has_next_page?: has_next_page?,
       prev_page_path: if(has_prev_page?, do: page_path(params, page - 1)),
-      next_page_path: if(has_next_page?, do: page_path(params, page + 1))
+      next_page_path: if(has_next_page?, do: page_path(params, page + 1)),
+      quick_filter_groups: quick_filter_groups(params),
+      mobile_filter_chips: mobile_filter_chips(params)
     )
   end
 
@@ -180,7 +182,11 @@ defmodule PortalWeb.JobController do
         {"q", clean_param(params["q"])},
         {"role", clean_param(params["role"])},
         {"company", clean_param(params["company"])},
-        {"location", clean_param(params["location"])}
+        {"location", clean_param(params["location"])},
+        {"seniority", clean_param(params["seniority"])},
+        {"workplace", clean_param(params["workplace"])},
+        {"salary", clean_param(params["salary"])},
+        {"perk", clean_param(params["perk"])}
       ]
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
       |> URI.encode_query()
@@ -215,6 +221,87 @@ defmodule PortalWeb.JobController do
       params
       |> Map.drop(["_csrf_token"])
       |> Map.put("page", Integer.to_string(page))
+      |> Enum.reject(fn {_key, value} -> is_nil(value) or value == "" end)
+      |> URI.encode_query()
+
+    if query == "", do: "/jobs", else: "/jobs?#{query}"
+  end
+
+  defp mobile_filter_chips(params) do
+    [
+      %{label: "Remote", key: "workplace", value: "remote"},
+      %{label: "Salary listed", key: "salary", value: "listed"},
+      %{label: "Visa friendly", key: "perk", value: "visa"},
+      %{label: "Senior", key: "seniority", value: "senior"}
+    ]
+    |> Enum.map(&quick_filter(params, &1))
+  end
+
+  defp quick_filter_groups(params) do
+    [
+      %{
+        label: "Role family",
+        filters: [
+          %{label: "Engineering", key: "role", value: "engineer"},
+          %{label: "Design", key: "role", value: "designer"},
+          %{label: "Data", key: "role", value: "data"}
+        ]
+      },
+      %{
+        label: "Seniority",
+        filters: [
+          %{label: "Junior", key: "seniority", value: "junior"},
+          %{label: "Mid-level", key: "seniority", value: "mid"},
+          %{label: "Senior", key: "seniority", value: "senior"},
+          %{label: "Staff+", key: "seniority", value: "staff"}
+        ]
+      },
+      %{
+        label: "Workplace",
+        filters: [
+          %{label: "Remote", key: "workplace", value: "remote"},
+          %{label: "Hybrid", key: "workplace", value: "hybrid"},
+          %{label: "Office", key: "workplace", value: "office"}
+        ]
+      },
+      %{
+        label: "Perks",
+        filters: [
+          %{label: "Visa sponsorship", key: "perk", value: "visa"},
+          %{label: "Equity", key: "perk", value: "equity"},
+          %{label: "Salary listed", key: "salary", value: "listed"}
+        ]
+      }
+    ]
+    |> Enum.map(fn group ->
+      Map.update!(group, :filters, &Enum.map(&1, fn filter -> quick_filter(params, filter) end))
+    end)
+  end
+
+  defp quick_filter(params, filter) do
+    active? = clean_param(params[filter.key]) == filter.value
+
+    filter
+    |> Map.put(:active?, active?)
+    |> Map.put(:path, filter_path(params, filter, active?))
+  end
+
+  defp filter_path(params, filter, true) do
+    params
+    |> Map.drop(["_csrf_token", "page", filter.key])
+    |> encode_jobs_query()
+  end
+
+  defp filter_path(params, filter, false) do
+    params
+    |> Map.drop(["_csrf_token", "page"])
+    |> Map.put(filter.key, filter.value)
+    |> encode_jobs_query()
+  end
+
+  defp encode_jobs_query(params) do
+    query =
+      params
       |> Enum.reject(fn {_key, value} -> is_nil(value) or value == "" end)
       |> URI.encode_query()
 

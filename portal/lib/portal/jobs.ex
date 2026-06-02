@@ -1204,6 +1204,10 @@ defmodule Portal.Jobs do
     |> fts_filter(params["role"], "title")
     |> fts_filter(params["company"], "company")
     |> location_filter(params["location"])
+    |> seniority_filter(params["seniority"])
+    |> workplace_filter(params["workplace"])
+    |> salary_filter(params["salary"])
+    |> perk_filter(params["perk"])
   end
 
   defp apply_order(query, %{"order" => "random"}) do
@@ -1211,7 +1215,16 @@ defmodule Portal.Jobs do
   end
 
   defp apply_order(query, _params) do
-    order_by(query, [j], desc: j.id)
+    order_by(query, [j],
+      desc:
+        fragment(
+          "COALESCE(NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), '1970-01-01')",
+          j.published_at,
+          j.updated_at,
+          j.created_at
+        ),
+      desc: j.id
+    )
   end
 
   defp text_search(query, value) when is_binary(value) do
@@ -1255,6 +1268,89 @@ defmodule Portal.Jobs do
       "{location location_city location_state location_country location_continent}"
     )
   end
+
+  defp seniority_filter(query, value) when value in [nil, ""], do: query
+
+  defp seniority_filter(query, "junior") do
+    where(query, [j], fragment("lower(coalesce(?, '')) LIKE ?", j.title, ^"%junior%"))
+  end
+
+  defp seniority_filter(query, "mid") do
+    where(
+      query,
+      [j],
+      fragment("lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
+        j.title,
+        ^"%mid%",
+        j.title,
+        ^"%intermediate%"
+      )
+    )
+  end
+
+  defp seniority_filter(query, "senior") do
+    where(query, [j], fragment("lower(coalesce(?, '')) LIKE ?", j.title, ^"%senior%"))
+  end
+
+  defp seniority_filter(query, "staff") do
+    where(
+      query,
+      [j],
+      fragment("lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
+        j.title,
+        ^"%staff%",
+        j.title,
+        ^"%principal%"
+      )
+    )
+  end
+
+  defp seniority_filter(query, _value), do: query
+
+  defp workplace_filter(query, value) when value in [nil, ""], do: query
+
+  defp workplace_filter(query, "remote") do
+    where(
+      query,
+      [j],
+      j.remote == 1 or
+        fragment("lower(coalesce(?, ''))", j.location_scope) == "remote" or
+        fragment("lower(coalesce(?, '')) LIKE ?", j.location, ^"%remote%")
+    )
+  end
+
+  defp workplace_filter(query, "hybrid") do
+    where(query, [j], fragment("lower(coalesce(?, '')) LIKE ?", j.location, ^"%hybrid%"))
+  end
+
+  defp workplace_filter(query, "office") do
+    where(
+      query,
+      [j],
+      not (j.remote == 1) and
+        fragment("lower(coalesce(?, '')) NOT LIKE ?", j.location, ^"%remote%") and
+        fragment("lower(coalesce(?, '')) NOT LIKE ?", j.location, ^"%hybrid%")
+    )
+  end
+
+  defp workplace_filter(query, _value), do: query
+
+  defp salary_filter(query, "listed") do
+    where(
+      query,
+      [j],
+      not is_nil(j.salary_min) or not is_nil(j.salary_max) or
+        fragment("trim(coalesce(?, '')) != ''", j.salary)
+    )
+  end
+
+  defp salary_filter(query, _value), do: query
+
+  defp perk_filter(query, value) when value in [nil, ""], do: query
+
+  defp perk_filter(query, "visa"), do: text_search(query, "visa sponsorship")
+  defp perk_filter(query, "equity"), do: text_search(query, "equity stock options")
+  defp perk_filter(query, _value), do: query
 
   defp fts_query(value, columns \\ nil) do
     terms =

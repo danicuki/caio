@@ -40,10 +40,9 @@
   </section>
 
   <div class="mobile-filter-chips" aria-label="Quick filters">
-    <span>Remote</span>
-    <span>Salary listed</span>
-    <span>Visa friendly</span>
-    <span>Senior</span>
+    <%= for chip <- @mobile_filter_chips do %>
+      <a href={chip.path} class={if(chip.active?, do: "active", else: nil)}>{chip.label}</a>
+    <% end %>
   </div>
 
   <section id="results" class="results-layout">
@@ -92,33 +91,23 @@
             <option value="random" selected={@params["order"] == "random"}>Random mix</option>
           </select>
         </label>
+        <input type="hidden" name="seniority" value={@params["seniority"]} />
+        <input type="hidden" name="workplace" value={@params["workplace"]} />
+        <input type="hidden" name="salary" value={@params["salary"]} />
+        <input type="hidden" name="perk" value={@params["perk"]} />
         <button type="submit" class="primary-button">Apply filters</button>
       </form>
 
-      <div class="mock-filters" aria-label="Additional prototype filters">
-        <div>
-          <strong>Role family</strong>
-          <span>Engineering</span>
-          <span>Design</span>
-          <span>Data</span>
-        </div>
-        <div>
-          <strong>Seniority</strong>
-          <span>Mid-level</span>
-          <span>Senior</span>
-          <span>Staff+</span>
-        </div>
-        <div>
-          <strong>Workplace</strong>
-          <span>Remote</span>
-          <span>Hybrid</span>
-          <span>Office</span>
-        </div>
-        <div>
-          <strong>Perks</strong>
-          <span>Visa sponsorship</span>
-          <span>Equity</span>
-          <span>Salary listed</span>
+      <div class="mock-filters" aria-label="Quick filters">
+        <div :for={group <- @quick_filter_groups}>
+          <strong>{group.label}</strong>
+          <a
+            :for={filter <- group.filters}
+            href={filter.path}
+            class={if(filter.active?, do: "active", else: nil)}
+          >
+            {filter.label}
+          </a>
         </div>
       </div>
 
