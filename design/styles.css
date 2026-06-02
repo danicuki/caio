@@ -1,0 +1,262 @@
+/* Caio — design tokens & base */
+
+:root {
+  /* Surfaces */
+  --bg: #F6F2E9;
+  --bg-2: #EFEADE;
+  --paper: #FBF9F3;
+  --paper-2: #FFFFFF;
+  --ink: #161A17;
+  --ink-2: #2E332E;
+  --muted: #6A6E66;
+  --muted-2: #8E9089;
+  --line: rgba(22, 26, 23, 0.10);
+  --line-2: rgba(22, 26, 23, 0.06);
+
+  /* "Ink surface" — intentionally dark feature panels (footer, CTAs, dark pills).
+     In dark mode these flip to warm cream — premium editorial inversion. */
+  --ink-surface: #161A17;
+  --ink-surface-fg: #FBF9F3;
+  --ink-surface-fg-2: rgba(251,249,243,0.7);
+  --ink-surface-fg-3: rgba(251,249,243,0.55);
+  --ink-surface-line: rgba(255,255,255,0.10);
+  --ink-surface-glow: rgba(125,217,196,0.18);
+  --ink-surface-accent: #7DD9C4;
+
+  /* Brand */
+  --green: #0E5C49;       /* trust */
+  --green-2: #0A4A3B;
+  --green-soft: #E2EBE3;
+  --green-tint: #EEF3EC;
+
+  --amber: #C27A1A;
+  --amber-2: #A2620F;
+  --amber-soft: #F4E5CB;
+  --amber-tint: #F7EEDB;
+
+  --red: #B33B2B;
+
+  /* Type */
+  --serif: "Newsreader", "Source Serif Pro", Georgia, serif;
+  --sans: "Geist", "Söhne", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+}
+
+/* Reset within artboards */
+.caio, .caio * { box-sizing: border-box; }
+.caio {
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "ss02", "cv11";
+  line-height: 1.45;
+}
+.caio h1, .caio h2, .caio h3, .caio h4 { margin: 0; font-weight: 500; letter-spacing: -0.01em; }
+.caio p { margin: 0; }
+.caio a { color: inherit; text-decoration: none; }
+.caio button { font: inherit; cursor: pointer; }
+.caio ::selection { background: var(--green); color: #fff; }
+
+/* Display serif modifier */
+.serif { font-family: var(--serif); font-weight: 400; letter-spacing: -0.02em; }
+.serif-italic { font-family: var(--serif); font-style: italic; font-weight: 400; }
+.mono { font-family: var(--mono); font-feature-settings: "tnum"; letter-spacing: -0.01em; }
+
+/* Tag pill */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 8px;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+  color: var(--ink-2); background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+.tag.green { color: var(--green-2); background: var(--green-soft); border-color: rgba(14,92,73,0.12); }
+.tag.amber { color: var(--amber-2); background: var(--amber-soft); border-color: rgba(194,122,26,0.18); }
+.tag.dot::before {
+  content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor;
+  display: inline-block; margin-right: 2px;
+}
+
+/* Primary button */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 20px;
+  font: 500 14.5px/1 var(--sans);
+  border-radius: var(--r-md); border: 1px solid transparent;
+  letter-spacing: -0.005em;
+  transition: transform .05s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--green); color: #FBF9F3; }
+.btn-primary:hover { background: var(--green-2); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { background: var(--paper); }
+.btn-amber { background: var(--ink); color: #FBF9F3; }
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.btn-lg { height: 52px; padding: 0 24px; font-size: 15px; }
+
+/* Inputs */
+.input {
+  font: 400 14.5px/1 var(--sans);
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 0 14px;
+  height: 44px;
+}
+.input::placeholder { color: var(--muted-2); }
+
+/* Subtle hover card */
+.card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+/* Striped placeholder for imagery */
+.placeholder-img {
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(22,26,23,0.04) 0 10px,
+      rgba(22,26,23,0.0) 10px 20px),
+    var(--paper);
+  border: 1px dashed var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+
+/* Dotted divider */
+.dotted {
+  border: 0; border-top: 1px dashed var(--line); margin: 0;
+}
+
+/* Underline link */
+.ulink { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+/* Logo */
+.logo-mark {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.03em;
+}
+.logo-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #1F8A6F 0%, #0E5C49 55%, #0A4A3B 100%);
+  position: relative;
+}
+.logo-dot::after {
+  content: ""; position: absolute; top: 4px; left: 5px;
+  width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.55);
+  filter: blur(1px);
+}
+
+/* "Live" pulse */
+.pulse {
+  display: inline-block; width: 7px; height: 7px; border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(14,92,73,0.45);
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(14,92,73,0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(14,92,73,0); }
+  100% { box-shadow: 0 0 0 0 rgba(14,92,73,0); }
+}
+
+/* No scrollbars within artboards */
+.caio *::-webkit-scrollbar { display: none; }
+.caio * { scrollbar-width: none; }
+
+/* Blur-locked job (gating) */
+.locked {
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* ─────────────────────────────────────────────
+   DARK MODE
+   Flips surfaces + text. Brand greens get
+   brighter for AA contrast on dark. Ink-surface
+   inverts to a warm cream — editorial reversal.
+   ───────────────────────────────────────────── */
+.caio.dark {
+  --bg: #14201B;
+  --bg-2: #1A2922;
+  --paper: #1F2D26;
+  --paper-2: #243329;
+  --ink: #ECE6D8;          /* primary text */
+  --ink-2: #C9C3B5;        /* secondary text */
+  --muted: #8C8F84;
+  --muted-2: #6E7167;
+  --line: rgba(236, 230, 216, 0.10);
+  --line-2: rgba(236, 230, 216, 0.06);
+
+  --green: #4FCDA8;
+  --green-2: #6FDBBA;
+  --green-soft: rgba(79, 205, 168, 0.14);
+  --green-tint: rgba(79, 205, 168, 0.08);
+
+  --amber: #E5A155;
+  --amber-2: #F2B469;
+  --amber-soft: rgba(229, 161, 85, 0.16);
+  --amber-tint: rgba(229, 161, 85, 0.08);
+
+  /* Inverted ink surface — light cream panel on dark page */
+  --ink-surface: #EDE3CC;
+  --ink-surface-fg: #14201B;
+  --ink-surface-fg-2: rgba(20, 32, 27, 0.72);
+  --ink-surface-fg-3: rgba(20, 32, 27, 0.55);
+  --ink-surface-line: rgba(20, 32, 27, 0.10);
+  --ink-surface-glow: rgba(14, 92, 73, 0.22);
+  --ink-surface-accent: #0E5C49;
+}
+
+.caio.dark .placeholder-img {
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(236,230,216,0.05) 0 10px,
+      rgba(236,230,216,0.0) 10px 20px),
+    var(--paper);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.caio.dark .pulse {
+  box-shadow: 0 0 0 0 rgba(79, 205, 168, 0.5);
+  animation-name: pulse-dark;
+}
+@keyframes pulse-dark {
+  0% { box-shadow: 0 0 0 0 rgba(79, 205, 168, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(79, 205, 168, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 205, 168, 0); }
+}
+
+.caio.dark .logo-dot {
+  background: radial-gradient(circle at 30% 30%, #6FDBBA 0%, #2A9379 55%, #0E5C49 100%);
+}
+
+.caio.dark .btn-primary { color: #0F1612; }
+.caio.dark .btn-primary:hover { background: var(--green-2); }
+.caio.dark .btn-amber { background: var(--ink-surface); color: var(--ink-surface-fg); }
+.caio.dark .tag { background: var(--paper); border-color: var(--line); color: var(--ink-2); }
+.caio.dark .tag.green { background: rgba(79,205,168,0.14); color: var(--green-2); border-color: rgba(79,205,168,0.22); }
+.caio.dark .tag.amber { background: rgba(229,161,85,0.14); color: var(--amber-2); border-color: rgba(229,161,85,0.24); }
+
+.caio.dark ::selection { background: var(--green); color: #0F1612; }
+
+/* Locked previews — slightly different blur recipe so dark blurs read */
+.caio.dark .locked { opacity: 0.7; }

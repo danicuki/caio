@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Caio — Job search for tech</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..600&family=Geist:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="styles.css"/>
+
+  <style>
+    html, body { margin: 0; padding: 0; background: #efeae0; font-family: "Geist", -apple-system, system-ui, sans-serif; }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="desktop-1.jsx"></script>
+<script type="text/babel" src="desktop-2.jsx"></script>
+<script type="text/babel" src="mobile.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+  // Helper — wraps any screen in a `.caio.dark` outer div so all CSS
+  // variables cascade to dark values without touching the components.
+  function Dark({ children, style }) {
+    return (
+      <div className="caio dark" style={{ background: "var(--bg)", minHeight: "100%", ...style }}>
+        {children}
+      </div>
+    );
+  }
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection id="desktop" title="Desktop · Light" subtitle="Hi-fi · 1440 wide · editorial cream theme">
+          <DCArtboard id="landing" label="01 · Landing" width={1440} height={2400}>
+            <DesktopLanding />
+          </DCArtboard>
+          <DCArtboard id="search" label="02 · Search results" width={1440} height={1700}>
+            <DesktopSearch />
+          </DCArtboard>
+          <DCArtboard id="detail" label="03 · Job detail" width={1440} height={1800}>
+            <DesktopDetail />
+          </DCArtboard>
+          <DCArtboard id="unlock" label="04 · Email unlock modal" width={1440} height={1200}>
+            <DesktopUnlock />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="desktop-dark" title="Desktop · Dark" subtitle="Same system, inverted — feature panels flip to warm cream">
+          <DCArtboard id="d-landing" label="01 · Landing" width={1440} height={2400}>
+            <Dark><DesktopLanding /></Dark>
+          </DCArtboard>
+          <DCArtboard id="d-search" label="02 · Search results" width={1440} height={1700}>
+            <Dark><DesktopSearch /></Dark>
+          </DCArtboard>
+          <DCArtboard id="d-detail" label="03 · Job detail" width={1440} height={1800}>
+            <Dark><DesktopDetail /></Dark>
+          </DCArtboard>
+          <DCArtboard id="d-unlock" label="04 · Email unlock modal" width={1440} height={1200}>
+            <Dark><DesktopUnlock /></Dark>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mobile" title="Mobile · Light" subtitle="iPhone · 402 × 874 · same system, restacked">
+          <DCArtboard id="m-landing" label="05 · Landing" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874}>
+                <MobileLanding />
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-search" label="06 · Search" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874}>
+                <MobileSearch />
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-detail" label="07 · Job detail" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874}>
+                <MobileDetail />
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-unlock" label="08 · Unlock sheet" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874}>
+                <MobileUnlock />
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mobile-dark" title="Mobile · Dark" subtitle="iPhone · dark theme">
+          <DCArtboard id="md-landing" label="05 · Landing" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874} dark>
+                <Dark style={{ height: "100%" }}><MobileLanding /></Dark>
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="md-search" label="06 · Search" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874} dark>
+                <Dark style={{ height: "100%" }}><MobileSearch /></Dark>
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="md-detail" label="07 · Job detail" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874} dark>
+                <Dark style={{ height: "100%" }}><MobileDetail /></Dark>
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="md-unlock" label="08 · Unlock sheet" width={460} height={920}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <IOSDevice width={402} height={874} dark>
+                <Dark style={{ height: "100%" }}><MobileUnlock /></Dark>
+              </IOSDevice>
+            </div>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
