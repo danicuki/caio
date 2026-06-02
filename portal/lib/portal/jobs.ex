@@ -1215,16 +1215,7 @@ defmodule Portal.Jobs do
   end
 
   defp apply_order(query, _params) do
-    order_by(query, [j],
-      desc:
-        fragment(
-          "COALESCE(NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), '1970-01-01')",
-          j.published_at,
-          j.updated_at,
-          j.created_at
-        ),
-      desc: j.id
-    )
+    order_by(query, [j], desc: j.published_at, desc: j.id)
   end
 
   defp text_search(query, value) when is_binary(value) do
