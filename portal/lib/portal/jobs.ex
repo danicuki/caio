@@ -9,6 +9,7 @@ defmodule Portal.Jobs do
   @guest_limit 10
   @guest_preview 18
   @member_limit 50
+  @browse_result_limit 10_000
   @sitemap_url_limit 50_000
   @sitemap_refresh_opts [timeout: :infinity]
   @home_cache_table :portal_home_jobs_cache
@@ -42,6 +43,15 @@ defmodule Portal.Jobs do
   def guest_limit, do: @guest_limit
   def page_size(true), do: @member_limit
   def page_size(false), do: @guest_preview
+  def browse_result_limit, do: @browse_result_limit
+
+  def max_page(total, per_page) when is_integer(total) and total > 0,
+    do: total |> Kernel./(per_page) |> Float.ceil() |> trunc()
+
+  def max_page(total, _per_page) when is_integer(total), do: 1
+
+  def max_page(_capped_total, per_page),
+    do: @browse_result_limit |> Kernel./(per_page) |> Float.ceil() |> trunc()
 
   def home_snapshot(limit \\ 6) do
     case cached_home_snapshot() do
@@ -1215,7 +1225,7 @@ defmodule Portal.Jobs do
     |> join(:left, [j, a], c in Company, on: c.id == coalesce(j.company_id, a.company_id))
   end
 
-  defp limited_count(query, cap \\ 10_000) do
+  defp limited_count(query, cap \\ @browse_result_limit) do
     count =
       query
       |> select([j], j.id)

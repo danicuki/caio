@@ -5,6 +5,7 @@ defmodule PortalWeb.JobControllerTest do
 
   alias Portal.Accounts
   alias Portal.Accounts.JobInterest
+  alias Portal.Jobs
   alias Portal.Jobs.JobPost
   alias Portal.Repo
 
@@ -161,6 +162,24 @@ defmodule PortalWeb.JobControllerTest do
       conn = get(conn, path)
       assert html_response(conn, 200) =~ "Best matches"
     end
+  end
+
+  test "GET /jobs redirects unlocked oversized pages before loading results", %{conn: conn} do
+    job_fixture()
+    {:ok, lead} = Accounts.upsert_lead(%{"email" => "member@example.com"})
+
+    conn =
+      conn
+      |> init_test_session(lead_id: lead.id)
+      |> get(~p"/jobs?page=10000")
+
+    assert redirected_to(conn, 302) == "/jobs?page=1"
+  end
+
+  test "max page respects the public browse cap for capped counts" do
+    assert Jobs.max_page("10000+", 50) == 200
+    assert Jobs.max_page(0, 50) == 1
+    assert Jobs.max_page(51, 50) == 2
   end
 
   test "GET /jobs hides obvious non-tech engineering roles", %{conn: conn} do

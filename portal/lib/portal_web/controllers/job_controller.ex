@@ -9,44 +9,51 @@ defmodule PortalWeb.JobController do
     conn = ensure_session_token(conn)
     lead = current_lead(conn)
     unlocked? = not is_nil(lead)
-    jobs = Jobs.search(params, unlocked?)
     total = Jobs.count(params)
-    page = if(unlocked?, do: Jobs.page(params), else: 1)
     per_page = Jobs.page_size(unlocked?)
-    has_prev_page? = unlocked? and page > 1
-    has_next_page? = unlocked? and next_page?(jobs, total, page, per_page)
+    requested_page = if(unlocked?, do: Jobs.page(params), else: 1)
+    page = min(requested_page, Jobs.max_page(total, per_page))
 
-    Analytics.capture("jobs_search_viewed", analytics_id(conn, lead), %{
-      query: params["q"],
-      role: params["role"],
-      company: params["company"],
-      location: params["location"],
-      order: params["order"],
-      result_count: total,
-      unlocked: unlocked?
-    })
+    if unlocked? and requested_page != page do
+      redirect(conn, to: page_path(params, page))
+    else
+      params = Map.put(params, "page", Integer.to_string(page))
+      jobs = Jobs.search(params, unlocked?)
+      has_prev_page? = unlocked? and page > 1
+      has_next_page? = unlocked? and next_page?(jobs, total, page, per_page)
 
-    render(conn, :index,
-      page_title: search_page_title(params),
-      meta_description: search_meta_description(params, total),
-      canonical_path: search_canonical_path(params),
-      json_ld: search_json_ld(params, total),
-      analytics_distinct_id: analytics_id(conn, lead),
-      jobs: jobs,
-      params: params,
-      total: total,
-      lead: lead,
-      unlocked?: unlocked?,
-      guest_limit: Jobs.guest_limit(),
-      page: page,
-      per_page: per_page,
-      has_prev_page?: has_prev_page?,
-      has_next_page?: has_next_page?,
-      prev_page_path: if(has_prev_page?, do: page_path(params, page - 1)),
-      next_page_path: if(has_next_page?, do: page_path(params, page + 1)),
-      quick_filter_groups: quick_filter_groups(params),
-      mobile_filter_chips: mobile_filter_chips(params)
-    )
+      Analytics.capture("jobs_search_viewed", analytics_id(conn, lead), %{
+        query: params["q"],
+        role: params["role"],
+        company: params["company"],
+        location: params["location"],
+        order: params["order"],
+        result_count: total,
+        unlocked: unlocked?
+      })
+
+      render(conn, :index,
+        page_title: search_page_title(params),
+        meta_description: search_meta_description(params, total),
+        canonical_path: search_canonical_path(params),
+        json_ld: search_json_ld(params, total),
+        analytics_distinct_id: analytics_id(conn, lead),
+        jobs: jobs,
+        params: params,
+        total: total,
+        lead: lead,
+        unlocked?: unlocked?,
+        guest_limit: Jobs.guest_limit(),
+        page: page,
+        per_page: per_page,
+        has_prev_page?: has_prev_page?,
+        has_next_page?: has_next_page?,
+        prev_page_path: if(has_prev_page?, do: page_path(params, page - 1)),
+        next_page_path: if(has_next_page?, do: page_path(params, page + 1)),
+        quick_filter_groups: quick_filter_groups(params),
+        mobile_filter_chips: mobile_filter_chips(params)
+      )
+    end
   end
 
   def show(conn, %{"id" => id}) do
