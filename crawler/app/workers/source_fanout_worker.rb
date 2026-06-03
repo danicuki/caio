@@ -53,6 +53,8 @@ class SourceFanoutWorker
     @enqueued_count = 0
     @fanout_budget = Integer(ENV.fetch("SOURCE_FETCH_MAX_ENQUEUE_PER_FANOUT", "500"))
     @fanout_budget_warning_emitted = false
+    @source_enqueued_counts = Hash.new(0)
+    @source_budget_warning_emitted = Set.new
 
     enqueue_static_sources
     enqueue_jobicy
@@ -268,10 +270,12 @@ class SourceFanoutWorker
 
   def enqueue_source(source, params)
     return if fanout_budget_exhausted?
+    return if source_budget_exhausted?(source)
     return unless fetch_target_due?(source, params)
 
     StandaloneSourceFetchWorker.perform_async(source, params)
     @enqueued_count += 1
+    @source_enqueued_counts[source] += 1
   end
 
   def source_yield_allowed?(source)
@@ -309,6 +313,29 @@ class SourceFanoutWorker
       @fanout_budget_warning_emitted = true
     end
     exhausted
+  end
+
+  def source_budget_exhausted?(source)
+    budget = source_fanout_budget(source)
+    exhausted = @source_enqueued_counts[source].to_i >= budget
+
+    if exhausted && !@source_budget_warning_emitted.include?(source)
+      warn "source fanout budget exhausted source=#{source} enqueued=#{@source_enqueued_counts[source]} budget=#{budget}"
+      @source_budget_warning_emitted.add(source)
+    end
+
+    exhausted
+  end
+
+  def source_fanout_budget(source)
+    source_env_key = source.to_s.upcase.gsub(/[^A-Z0-9]+/, "_")
+
+    Integer(
+      ENV.fetch(
+        "#{source_env_key}_SOURCE_FETCH_MAX_ENQUEUE_PER_FANOUT",
+        ENV.fetch("SOURCE_FETCH_MAX_ENQUEUE_PER_SOURCE", "50")
+      )
+    )
   end
 
   def fetch_target_due?(source, params)

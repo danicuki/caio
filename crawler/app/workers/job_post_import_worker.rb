@@ -1,4 +1,5 @@
 require Rails.root.join("lib/standalone/job_api_batch")
+require "set"
 
 class JobPostImportWorker
   include Sidekiq::Job
@@ -8,7 +9,55 @@ class JobPostImportWorker
   def self.enqueue(source, jobs)
     return if jobs.empty?
 
-    perform_async(source, JobBatchSpool.write(source, jobs))
+    new_jobs, update_jobs = split_new_jobs(source, jobs)
+
+    enqueue_batch(source, new_jobs, :job_writes_new)
+    enqueue_batch(source, update_jobs, :job_writes_updates)
+  end
+
+  def self.enqueue_batch(source, jobs, queue)
+    return if jobs.empty?
+
+    set(queue: queue).perform_async(source, JobBatchSpool.write(source, jobs))
+  end
+
+  def self.split_new_jobs(source, jobs)
+    existing_keys, existing_urls = existing_identifiers(source, jobs)
+
+    jobs.partition do |job|
+      source_key = job_identifier(job, :source_key)
+      source_url = job_identifier(job, :source_url)
+
+      !existing_keys.include?(source_key) && !existing_urls.include?(source_url)
+    end
+  rescue StandardError => e
+    warn "job import priority classification failed source=#{source}: #{e.class}: #{e.message}"
+    [jobs, []]
+  end
+
+  def self.existing_identifiers(source, jobs)
+    source_keys = jobs.filter_map { |job| job_identifier(job, :source_key) }.uniq
+    source_urls = jobs.filter_map { |job| job_identifier(job, :source_url) }.uniq
+
+    existing_keys =
+      if source_keys.empty?
+        Set.new
+      else
+        JobPost.where(source: source, source_key: source_keys).pluck(:source_key).map(&:to_s).to_set
+      end
+
+    existing_urls =
+      if source_urls.empty?
+        Set.new
+      else
+        JobPost.where(source_url: source_urls).pluck(:source_url).map(&:to_s).to_set
+      end
+
+    [existing_keys, existing_urls]
+  end
+
+  def self.job_identifier(job, key)
+    (job[key] || job[key.to_s]).to_s.presence
   end
 
   def perform(source, jobs_payload)
