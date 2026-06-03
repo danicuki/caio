@@ -8,7 +8,7 @@ defmodule PortalWeb.PageHTML do
 
   embed_templates "page_html/*"
 
-  @default_description "Caio is a cleaner search engine for public tech jobs, with searchable salary, location, company, and source signals."
+  @default_description "Caio searches public tech jobs and keeps company, salary, location, source, and posting-date details visible."
   @default_image "/images/caio-social-preview.png"
 
   def meta_title(assigns) do

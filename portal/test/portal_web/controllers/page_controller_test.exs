@@ -5,7 +5,7 @@ defmodule PortalWeb.PageControllerTest do
     conn = get(conn, ~p"/")
     response = html_response(conn, 200)
 
-    assert response =~ "The next job you'll actually want is in here somewhere."
+    assert response =~ "Search tech jobs with the useful details left in."
     assert response =~ ~s(<meta property="og:title")
     assert response =~ "caio-social-preview.png"
     assert response =~ ~s(<link rel="canonical" href="https://caio-jobs.com/")
@@ -18,7 +18,7 @@ defmodule PortalWeb.PageControllerTest do
 
   test "GET /how-it-works", %{conn: conn} do
     conn = get(conn, ~p"/how-it-works")
-    assert html_response(conn, 200) =~ "From public posting to usable job signal."
+    assert html_response(conn, 200) =~ "From public posting to searchable job record."
   end
 
   test "GET /pricing", %{conn: conn} do
@@ -49,15 +49,15 @@ defmodule PortalWeb.PageControllerTest do
   test "GET acquisition pages", %{conn: conn} do
     for {path, text} <- [
           {"/hiring-now", "Companies with the most open tech roles on Caio."},
-          {"/remote-tech-jobs", "Start with cleaner searches for remote tech roles."},
-          {"/startup-jobs", "Search startup-flavored tech roles from one cleaner surface."},
+          {"/remote-tech-jobs", "Start with remote tech roles that are easier to compare."},
+          {"/startup-jobs", "Search startup tech roles from one place."},
           {"/top-skills", "Popular skills and categories"}
         ] do
       conn = get(conn, path)
       response = html_response(conn, 200)
 
       assert response =~ text
-      assert response =~ "Shareable searches for active jobseekers"
+      assert response =~ "Searches you can open and adjust"
       assert response =~ "Ask Daniel about Agent"
     end
   end

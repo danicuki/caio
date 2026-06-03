@@ -49,8 +49,11 @@ defmodule Portal.Jobs do
         snapshot
 
       :miss ->
+        stats = homepage_stats()
+
         snapshot = %{
-          total_count: homepage_total_count(),
+          total_count: stats.open_jobs_count,
+          stats: stats,
           sample_jobs: homepage_sample(limit)
         }
 
@@ -109,17 +112,16 @@ defmodule Portal.Jobs do
   end
 
   def homepage_total_count do
-    company_total =
-      Company
-      |> where([c], c.open_jobs_count > 0)
-      |> exclude_noisy_companies()
-      |> select([c], sum(c.open_jobs_count))
-      |> Repo.one()
+    homepage_stats().open_jobs_count
+  end
 
-    if company_total && company_total > 0 do
-      company_total
+  def homepage_stats do
+    stats = company_homepage_stats()
+
+    if stats.company_count > 0 do
+      stats
     else
-      total_count()
+      job_homepage_stats()
     end
   end
 
@@ -130,6 +132,66 @@ defmodule Portal.Jobs do
     |> limit(^limit)
     |> select_list_fields()
     |> Repo.all()
+  end
+
+  defp company_homepage_stats do
+    Company
+    |> where([c], c.open_jobs_count > 0)
+    |> exclude_noisy_companies()
+    |> select([c], %{
+      company_count: count(c.id),
+      open_jobs_count: fragment("COALESCE(SUM(?), 0)", c.open_jobs_count),
+      remote_count: fragment("COALESCE(SUM(?), 0)", c.remote_count),
+      salary_count: fragment("COALESCE(SUM(?), 0)", c.salary_count),
+      latest_posted_at: max(c.latest_posted_at)
+    })
+    |> Repo.one()
+    |> normalize_homepage_stats()
+  end
+
+  defp job_homepage_stats do
+    JobPost
+    |> public_scope()
+    |> select([j], %{
+      company_count: fragment("COUNT(DISTINCT NULLIF(lower(trim(?)), ''))", j.company),
+      open_jobs_count: count(j.id),
+      remote_count:
+        fragment(
+          "SUM(CASE WHEN ? = 1 OR lower(coalesce(?, '')) LIKE '%remote%' THEN 1 ELSE 0 END)",
+          j.remote,
+          j.location_scope
+        ),
+      salary_count:
+        fragment(
+          "SUM(CASE WHEN ? IS NOT NULL OR ? IS NOT NULL OR trim(coalesce(?, '')) != '' THEN 1 ELSE 0 END)",
+          j.salary_min,
+          j.salary_max,
+          j.salary
+        ),
+      latest_posted_at: max(j.published_at)
+    })
+    |> Repo.one()
+    |> normalize_homepage_stats()
+  end
+
+  defp normalize_homepage_stats(nil) do
+    %{
+      company_count: 0,
+      open_jobs_count: 0,
+      remote_count: 0,
+      salary_count: 0,
+      latest_posted_at: nil
+    }
+  end
+
+  defp normalize_homepage_stats(stats) do
+    %{
+      company_count: stats.company_count || 0,
+      open_jobs_count: stats.open_jobs_count || 0,
+      remote_count: stats.remote_count || 0,
+      salary_count: stats.salary_count || 0,
+      latest_posted_at: stats.latest_posted_at
+    }
   end
 
   def count(params) do
@@ -1270,7 +1332,8 @@ defmodule Portal.Jobs do
     where(
       query,
       [j],
-      fragment("lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
+      fragment(
+        "lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
         j.title,
         ^"%mid%",
         j.title,
@@ -1287,7 +1350,8 @@ defmodule Portal.Jobs do
     where(
       query,
       [j],
-      fragment("lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
+      fragment(
+        "lower(coalesce(?, '')) LIKE ? OR lower(coalesce(?, '')) LIKE ?",
         j.title,
         ^"%staff%",
         j.title,

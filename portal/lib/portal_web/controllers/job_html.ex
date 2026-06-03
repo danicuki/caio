@@ -147,14 +147,14 @@ defmodule PortalWeb.JobHTML do
     ~H"""
     <%= if @job.company do %>
       <span>
-        Live platform signals for <a
+        Current index details for <a
           href={Portal.Jobs.company_path(@job)}
           class="company-profile-inline-link"
-        >{@job.company}</a>. External review data can be layered in later from a company profile table.
+        >{@job.company}</a>, based on roles Caio has indexed from public sources.
       </span>
     <% else %>
       <span>
-        Live platform signals for this company. External review data can be layered in later from a company profile table.
+        Current index details for this company, based on roles Caio has indexed from public sources.
       </span>
     <% end %>
     """
@@ -261,7 +261,7 @@ defmodule PortalWeb.JobHTML do
         <span class="eyebrow">Free. 20 seconds. No password.</span>
         <strong>See every match in this search.</strong>
         <p>
-          Create a free Caio profile to unlock the full index and keep your job-search signal for future recommendations.
+          Create a free Caio profile to unlock more results and save your role and location preferences.
         </p>
         <a href="#unlock" class="primary-button">Unlock free search</a>
       </section>
@@ -283,9 +283,9 @@ defmodule PortalWeb.JobHTML do
   attr :benefits, :list,
     default: [
       "Unlimited search and filters",
-      "Target role and location signal",
+      "Saved role and location preferences",
       "Original source links stay visible",
-      "First access to the application-agent tools"
+      "Optional application help later"
     ]
 
   def profile_modal(assigns) do
@@ -367,7 +367,7 @@ defmodule PortalWeb.JobHTML do
             <span>caio</span>
           </a>
           <p>
-            A cleaner search engine for public tech jobs. The application-agent product comes next.
+            Search public tech jobs with the source, salary, location, and posting date kept visible.
           </p>
         </div>
 

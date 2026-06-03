@@ -4,7 +4,7 @@
   <section class="search-command">
     <div>
       <p class="eyebrow">Search results</p>
-      <h1>Find the roles with enough signal to open.</h1>
+      <h1>Search roles worth opening.</h1>
     </div>
     <form action={~p"/jobs"} method="get" class="search-panel results-search">
       <label>
@@ -126,10 +126,10 @@
           <%= if @unlocked? do %>
             <span>Showing page {@page} · {@per_page} roles per page.</span>
           <% else %>
-            <span>Guest preview shows {@guest_limit}; unlock for the deeper list.</span>
+            <span>Guest preview shows {@guest_limit}; unlock for more results.</span>
           <% end %>
         </div>
-        <span class="freshness-pill">Verified · live index</span>
+        <span class="freshness-pill">Current public index</span>
       </div>
 
       <%= if @jobs == [] do %>
@@ -200,7 +200,7 @@
         </div>
       <% else %>
         <div class="preview-card">
-          <h2>Search preview</h2>
+          <h2>First result</h2>
           <p>Run a search to see the first role summarized here.</p>
         </div>
       <% end %>
@@ -215,7 +215,7 @@
       params={@params}
       title="More matching jobs"
       accent="are waiting."
-      body="Drop your email and unlock the deeper index. No spam, no recruiter noise, and no sharing your email with employers."
+      body="Drop your email to unlock more results. No password, no recruiter handoff, and no sharing your email with employers."
       submit_label="Unlock free search"
     />
   <% end %>

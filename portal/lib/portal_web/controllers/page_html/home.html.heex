@@ -4,16 +4,16 @@
   <section class="hero-band">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow">Live global tech index</p>
-        <h1>The next job you'll actually want is in here somewhere.</h1>
+        <p class="eyebrow">Public tech job index</p>
+        <h1>Search tech jobs with the useful details left in.</h1>
         <p class="hero-subtitle">
-          Search public boards, ATS feeds, and company career pages with cleaner location,
-          salary, and source signals.
+          Caio indexes public postings from company career pages and job platforms, then keeps
+          the company, location, salary, source, and posting-date details visible while you search.
         </p>
 
         <p class="job-count-badge">
           <strong>{delimit(@total_jobs)}</strong>
-          <span>indexed roles</span>
+          <span>active indexed roles</span>
         </p>
 
         <form action={~p"/jobs"} method="get" class="search-panel hero-search">
@@ -29,7 +29,7 @@
         </form>
 
         <p class="privacy-note">
-          Free preview. Unlock the full index with an email, no password.
+          Free preview. Unlock more results with an email, no password.
         </p>
 
         <div class="hero-quick-searches" aria-label="Popular job searches">
@@ -41,25 +41,42 @@
       </div>
 
       <aside class="live-index-panel" aria-label="Live job index snapshot">
-        <div class="map-card">
-          <div class="map-header">
-            <span>World index</span>
-            <strong>{delimit(@total_jobs)}</strong>
+        <div class="index-receipts">
+          <div class="index-receipts-header">
+            <span>Index snapshot</span>
+            <strong>Cached counts</strong>
           </div>
-          <div class="world-map">
-            <span class="map-pin pin-na"></span>
-            <span class="map-pin pin-eu"></span>
-            <span class="map-pin pin-apac"></span>
-            <span class="map-pin pin-remote"></span>
+
+          <div class="index-stat-grid">
+            <a href={~p"/jobs"}>
+              <strong>{delimit(@index_stats.open_jobs_count)}</strong>
+              <span>active roles</span>
+            </a>
+            <a href={~p"/hiring-now"}>
+              <strong>{delimit(@index_stats.company_count)}</strong>
+              <span>companies</span>
+            </a>
+            <a href={~p"/jobs?workplace=remote"}>
+              <strong>{delimit(@index_stats.remote_count)}</strong>
+              <span>remote roles</span>
+            </a>
+            <a href={~p"/jobs?salary=listed"}>
+              <strong>{delimit(@index_stats.salary_count)}</strong>
+              <span>with salary</span>
+            </a>
           </div>
-          <div class="map-stats">
-            <span>Remote</span>
-            <span>Hybrid</span>
-            <span>On-site</span>
-          </div>
+
+          <p>
+            Counts are cached from current public postings. Stale rows and broad-market employers
+            are filtered out of the public index.
+          </p>
         </div>
 
         <div class="mini-list">
+          <div class="mini-list-header">
+            <span>Recently indexed</span>
+            <a href={~p"/jobs"}>View all</a>
+          </div>
           <%= for job <- @sample_jobs do %>
             <a href={~p"/jobs/#{job.id}"} class="mini-job">
               <PortalWeb.JobHTML.company_avatar job={job} />
@@ -68,6 +85,13 @@
                 <small>
                   {job.company || "Company"} · {PortalWeb.JobHTML.compact_location(job)}
                 </small>
+                <span class="mini-job-meta">
+                  <em>{PortalWeb.JobHTML.source_label(job.source)}</em>
+                  <em>{PortalWeb.JobHTML.posted_label(job)}</em>
+                  <%= if salary = PortalWeb.JobHTML.salary(job) do %>
+                    <em>{salary}</em>
+                  <% end %>
+                </span>
               </span>
             </a>
           <% end %>
@@ -77,7 +101,7 @@
   </section>
 
   <section class="logo-strip" aria-label="Example indexed companies">
-    <span>Indexed from public sources around</span>
+    <span>Example company pages</span>
     <%= for company <- @highlighted_companies do %>
       <a href={Portal.Jobs.company_path(company)}>
         <strong>{company}</strong>
@@ -87,38 +111,40 @@
 
   <section class="feature-band">
     <article>
-      <span class="feature-icon">0</span>
-      <h2>Free to use</h2>
-      <p>Preview real roles immediately and unlock the deeper list without a paid account.</p>
+      <span class="feature-icon">ad</span>
+      <h2>No sponsored order</h2>
+      <p>Results come from indexed postings, not paid placement or recruiter campaigns.</p>
     </article>
     <article>
-      <span class="feature-icon">S</span>
-      <h2>Search signal</h2>
+      <span class="feature-icon">src</span>
+      <h2>Source stays visible</h2>
       <p>
-        Your target role and location become the profile Caio uses to sharpen recommendations.
+        Open the original posting from the job page and see where each role came from.
       </p>
     </article>
     <article>
-      <span class="feature-icon">D</span>
-      <h2>Agent foundation</h2>
+      <span class="feature-icon">tag</span>
+      <h2>Fewer mystery filters</h2>
       <p>
-        New roles, salary clues, and source updates are structured for the application-agent workflow coming next.
+        Search by role, company, location, remote status, salary presence, and practical tags.
       </p>
     </article>
     <article>
-      <span class="feature-icon">%</span>
-      <h2>Salary comparisons</h2>
-      <p>When postings include compensation, Caio keeps it visible instead of buried in prose.</p>
+      <span class="feature-icon">$</span>
+      <h2>Salary is surfaced</h2>
+      <p>
+        When a posting includes compensation, Caio shows it instead of hiding it in the description.
+      </p>
     </article>
   </section>
 
   <section class="agent-soft-cta home-agent-cta">
     <div>
       <span class="eyebrow">Search is only step one</span>
-      <h2>Use the portal freely. If applying becomes a grind, Caio can help there too.</h2>
+      <h2>Use the index for free. Ask for help only when applying becomes the bottleneck.</h2>
       <p>
-        After signup, Daniel sends the Agent offer directly: Caio can help find matches,
-        adapt your CV, and apply consistently when you want that level of support.
+        Daniel is building Caio Agent for the repetitive part after search: finding good matches,
+        adapting application material, and tracking what happened.
       </p>
     </div>
     <a
@@ -138,7 +164,7 @@
       params={%{}}
       title="Unlock your"
       accent="free profile."
-      body="Drop your email once to unlock the full index and keep your job-search signal."
+      body="Drop your email once to unlock more results and save your search preferences."
       submit_label="Unlock free profile"
     />
   <% end %>

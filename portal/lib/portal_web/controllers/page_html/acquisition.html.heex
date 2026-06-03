@@ -10,8 +10,8 @@
     <aside class="acquisition-hero-card">
       <strong>Search first.</strong>
       <span>
-        Use Caio to find real roles. If the job hunt gets repetitive, the Agent offer
-        appears after signup.
+        Use Caio to find real roles. If applying starts taking over your week, ask Daniel
+        about Agent.
       </span>
       <a href={~p"/jobs"} class="primary-button" data-acquisition-link="acquisition_search">
         Search jobs
@@ -22,7 +22,7 @@
   <section class="quick-search-band" aria-label="Popular search links">
     <div>
       <span class="eyebrow">Fast starts</span>
-      <h2>Shareable searches for active jobseekers</h2>
+      <h2>Searches you can open and adjust</h2>
     </div>
     <div class="quick-search-list">
       <%= for search <- @quick_searches do %>
@@ -88,10 +88,10 @@
   <section class="agent-soft-cta">
     <div>
       <span class="eyebrow">Applying is the hard part</span>
-      <h2>When searching turns into busywork, Caio can help with the next step.</h2>
+      <h2>When applying takes over, Caio can help with the next step.</h2>
       <p>
-        The portal stays free. The paid Agent offer is for people who want help
-        finding matches, adapting their CV, and applying consistently.
+        The portal stays free. Agent is for people who want hands-on help finding matches,
+        adapting their CV, and applying consistently.
       </p>
     </div>
     <a
@@ -111,7 +111,7 @@
       params={%{}}
       title="Unlock your"
       accent="free profile."
-      body="Drop your email once to unlock the full index and keep your job-search signal."
+      body="Drop your email once to unlock more results and save your search preferences."
       submit_label="Unlock free profile"
     />
   <% end %>

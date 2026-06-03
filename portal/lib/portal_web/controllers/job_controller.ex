@@ -173,7 +173,7 @@ defmodule PortalWeb.JobController do
         true -> ""
       end
 
-    "Meet #{count} #{subject} jobs#{scope} on Caio. Compare live tech roles with cleaner company, salary, location, and source signals before applying."
+    "Search #{count} #{subject} jobs#{scope} on Caio. Compare company, salary, location, source, and posting-date details before applying."
   end
 
   defp search_canonical_path(params) do
@@ -356,7 +356,8 @@ defmodule PortalWeb.JobController do
           "logo" => PortalWeb.JobHTML.company_logo_url(job),
           "sameAs" => PortalWeb.PageHTML.absolute_url(Jobs.company_path(job))
         },
-        "jobLocationType" => if(PortalWeb.JobHTML.remote_label(job), do: "TELECOMMUTE", else: nil),
+        "jobLocationType" =>
+          if(PortalWeb.JobHTML.remote_label(job), do: "TELECOMMUTE", else: nil),
         "jobLocation" => job_location,
         "applicantLocationRequirements" => applicant_location_requirements,
         "baseSalary" => salary_json_ld(job),
@@ -416,14 +417,15 @@ defmodule PortalWeb.JobController do
   defp job_location_json_ld(%{location_country: country} = job) when country not in [nil, ""] do
     %{
       "@type" => "Place",
-      "address" => %{
-        "@type" => "PostalAddress",
-        "addressLocality" => Map.get(job, :location_city),
-        "addressRegion" => location_region(job),
-        "addressCountry" => country
-      }
-      |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
-      |> Map.new()
+      "address" =>
+        %{
+          "@type" => "PostalAddress",
+          "addressLocality" => Map.get(job, :location_city),
+          "addressRegion" => location_region(job),
+          "addressCountry" => country
+        }
+        |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+        |> Map.new()
     }
   end
 

@@ -25,7 +25,7 @@ defmodule PortalWeb.CompanyController do
         render(conn, :show,
           page_title: "#{profile.name} jobs",
           meta_description:
-            "#{profile.stats.open_jobs_count} open #{profile.name} roles indexed by Caio, with source, location, and salary signals.",
+            "#{profile.stats.open_jobs_count} open #{profile.name} roles indexed by Caio, with source, location, and salary details.",
           canonical_path: ~p"/companies/#{profile.slug}",
           json_ld: company_json_ld(profile),
           analytics_distinct_id: analytics_id(conn, lead),

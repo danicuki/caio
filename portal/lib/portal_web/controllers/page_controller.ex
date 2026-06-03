@@ -5,22 +5,26 @@ defmodule PortalWeb.PageController do
 
   def home(conn, _params) do
     conn = ensure_session_token(conn)
-    %{sample_jobs: sample_jobs, total_count: total_jobs} = Jobs.home_snapshot(6)
+    snapshot = Jobs.home_snapshot(6)
+    %{sample_jobs: sample_jobs, total_count: total_jobs} = snapshot
+    index_stats = Map.get(snapshot, :stats) || Jobs.homepage_stats()
     lead = current_lead(conn)
 
     Analytics.capture("home_viewed", analytics_id(conn, lead), %{
       total_jobs: total_jobs,
+      company_count: index_stats.company_count,
       sample_count: length(sample_jobs)
     })
 
     render(conn, :home,
-      page_title: "Cleaner tech job search",
+      page_title: "Search public tech jobs",
       meta_description:
-        "Search hundreds of thousands of public tech jobs on Caio with cleaner company, salary, location, and source signals.",
+        "Search public tech jobs on Caio with company, salary, location, source, and posting-date details kept visible.",
       canonical_path: "/",
       analytics_distinct_id: analytics_id(conn, lead),
       sample_jobs: sample_jobs,
       highlighted_companies: ["Stripe", "Figma", "GitHub", "Shopify", "Vercel"],
+      index_stats: index_stats,
       quick_searches: quick_searches(),
       total_jobs: total_jobs,
       lead: lead
@@ -115,7 +119,7 @@ defmodule PortalWeb.PageController do
       eyebrow: "About Caio",
       title: "A quieter layer on top of the noisy job market.",
       intro:
-        "Caio indexes public job postings, normalizes the useful signals, and helps candidates spend less time sorting through low-quality listings.",
+        "Caio indexes public job postings, cleans up the fields that matter, and helps candidates spend less time sorting through weak listings.",
       sections: [
         %{
           title: "What Caio is",
@@ -140,9 +144,9 @@ defmodule PortalWeb.PageController do
     render_static(conn,
       page_title: "How it works",
       eyebrow: "How it works",
-      title: "From public posting to usable job signal.",
+      title: "From public posting to searchable job record.",
       intro:
-        "Caio turns scattered job postings into a structured search experience, then uses profile signal to make the next step more targeted.",
+        "Caio turns scattered job postings into structured search results, then uses saved preferences to make the next step more targeted.",
       sections: [
         %{
           title: "1. Crawl public sources",
@@ -152,17 +156,17 @@ defmodule PortalWeb.PageController do
         %{
           title: "2. Normalize the fields",
           body:
-            "Caio standardizes company names, locations, salary ranges, tags, remote signals, and posting dates so search results are easier to compare."
+            "Caio standardizes company names, locations, salary ranges, tags, remote status, and posting dates so search results are easier to compare."
         },
         %{
-          title: "3. Filter out bad signal",
+          title: "3. Filter out weak records",
           body:
             "Quality gates reject obvious junk, stale records, and malformed data. Public counts use a freshness window rather than the raw database total."
         },
         %{
           title: "4. Unlock a profile",
           body:
-            "A free profile stores target role and location preferences. That signal can later power saved searches, daily digests, and agent-assisted applications."
+            "A free profile stores target role and location preferences. Those preferences can later power saved searches, daily digests, and agent-assisted applications."
         }
       ]
     )
@@ -174,7 +178,7 @@ defmodule PortalWeb.PageController do
       eyebrow: "Pricing",
       title: "Free while Caio is being built in public.",
       intro:
-        "The current job search product is free. The codebase is open source, and the paid product will come later around higher-value application-agent workflows.",
+        "The current job search product is free. The codebase is open source, and the paid product will come later around hands-on help with applications.",
       sections: [
         %{
           title: "Job search",
@@ -340,7 +344,7 @@ defmodule PortalWeb.PageController do
       page_title: "Remote tech jobs",
       canonical_path: "/remote-tech-jobs",
       eyebrow: "Remote tech jobs",
-      title: "Start with cleaner searches for remote tech roles.",
+      title: "Start with remote tech roles that are easier to compare.",
       intro:
         "Shareable searches for people who want remote software, data, product, and infrastructure roles without rebuilding the same filters every day.",
       meta_description:
@@ -356,7 +360,7 @@ defmodule PortalWeb.PageController do
       page_title: "Startup jobs",
       canonical_path: "/startup-jobs",
       eyebrow: "Startup jobs",
-      title: "Search startup-flavored tech roles from one cleaner surface.",
+      title: "Search startup tech roles from one place.",
       intro:
         "Useful entry points for startup, founding engineer, product, growth, and early-stage searches. Open the original posting when a role looks real.",
       meta_description:
@@ -374,7 +378,7 @@ defmodule PortalWeb.PageController do
       eyebrow: "Top skills",
       title: "Popular skills and categories in Caio's tech job index.",
       intro:
-        "A quick way to jump from market signal into real searches. Pick a skill, compare open roles, and adjust from there.",
+        "A quick way to jump into real searches. Pick a skill, compare open roles, and adjust from there.",
       meta_description:
         "Explore popular tech job skills and categories from Caio's job index with direct search links.",
       kind: :keywords,
