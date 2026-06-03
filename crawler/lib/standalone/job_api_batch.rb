@@ -1,4 +1,5 @@
 require "csv"
+require "base64"
 require "cgi"
 require "digest"
 require "fileutils"
@@ -1443,6 +1444,264 @@ module Standalone
 
       def themuse_description(job)
         job["contents"].to_s.strip
+      end
+    end
+
+    class UsaJobs < Base
+      QUERIES = [
+        "software engineer",
+        "software developer",
+        "information technology",
+        "data scientist",
+        "data analyst",
+        "cybersecurity",
+        "devops",
+        "cloud engineer",
+        "product manager",
+        "designer"
+      ].freeze
+
+      def name = "usajobs"
+
+      def fetch
+        queries.flat_map do |query|
+          fetch_query(keyword: query, page: 1)
+        end.uniq { |job| job.fetch(:source_key) }
+      end
+
+      def fetch_query(keyword:, page:, remote: false)
+        return [] unless configured?
+
+        params = {
+          "Keyword" => keyword,
+          "WhoMayApply" => "public",
+          "Fields" => "Full",
+          "DatePosted" => ENV.fetch("USAJOBS_DATE_POSTED_DAYS", "60"),
+          "ResultsPerPage" => ENV.fetch("USAJOBS_RESULTS_PER_PAGE", "100"),
+          "Page" => page
+        }
+        params["RemoteIndicator"] = "true" if remote
+
+        payload = usajobs_get_json("https://data.usajobs.gov/api/Search?#{URI.encode_www_form(params)}")
+        Array(payload.dig("SearchResult", "SearchResultItems")).map { |item| normalize(item) }
+      end
+
+      private
+
+      def queries
+        ENV.fetch("USAJOBS_QUERIES", QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def configured?
+        ENV["USAJOBS_API_KEY"].to_s.strip != "" && ENV["USAJOBS_USER_AGENT"].to_s.strip != ""
+      end
+
+      def usajobs_get_json(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["Host"] = "data.usajobs.gov"
+          request["User-Agent"] = ENV.fetch("USAJOBS_USER_AGENT")
+          request["Authorization-Key"] = ENV.fetch("USAJOBS_API_KEY")
+          request["Accept"] = "application/json"
+          http.request(request)
+        end
+
+        raise RateLimited, "USAJobs rate limited" if response.code.to_i == 429
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)
+      end
+
+      def normalize(item)
+        descriptor = item["MatchedObjectDescriptor"] || {}
+        details = descriptor.dig("UserArea", "Details") || {}
+        categories = Array(descriptor["JobCategory"]).map { |category| category["Name"] }.compact
+        schedules = Array(descriptor["PositionSchedule"]).map { |schedule| schedule["Name"] }.compact
+        offering_types = Array(descriptor["PositionOfferingType"]).map { |type| type["Name"] }.compact
+
+        {
+          source_key: source_key(descriptor["PositionID"], item["MatchedObjectId"], descriptor["PositionURI"]),
+          title: descriptor.fetch("PositionTitle"),
+          company: descriptor["OrganizationName"] || descriptor["DepartmentName"],
+          location: location_text(descriptor),
+          remote: remote?(descriptor, details),
+          employment_type: (schedules + offering_types).uniq.join(", "),
+          category: categories.join(", "),
+          salary: salary_text(descriptor["PositionRemuneration"]),
+          source_url: descriptor["PositionURI"] || Array(descriptor["ApplyURI"]).first,
+          published_at: parse_time(descriptor["PublicationStartDate"] || descriptor["PositionStartDate"]),
+          tags: tags(descriptor, details),
+          description: description_html(descriptor, details),
+          raw: item
+        }
+      end
+
+      def location_text(descriptor)
+        display = descriptor["PositionLocationDisplay"].to_s.strip
+        return display unless display.empty?
+
+        Array(descriptor["PositionLocation"]).map { |location| location["LocationName"] }.compact.join(", ")
+      end
+
+      def remote?(descriptor, details)
+        text = [
+          descriptor["PositionLocationDisplay"],
+          Array(descriptor["PositionLocation"]).map { |location| location["LocationName"] },
+          details["JobSummary"],
+          details["MajorDuties"],
+          details["OtherInformation"]
+        ].flatten.compact.join(" ")
+
+        text.match?(/\b(remote|virtual|location negotiable|work from home)\b/i)
+      end
+
+      def salary_text(remuneration)
+        Array(remuneration).map do |salary|
+          minimum = salary["MinimumRange"].to_s.delete(",")
+          maximum = salary["MaximumRange"].to_s.delete(",")
+          range = [minimum, maximum].reject(&:empty?).uniq.join(" - ")
+          interval = salary["Description"].to_s.strip
+          ["USD", range, interval].reject(&:empty?).join(" ")
+        end.reject(&:empty?).uniq.join(", ")
+      end
+
+      def tags(descriptor, details)
+        [
+          descriptor["DepartmentName"],
+          Array(descriptor["JobCategory"]).map { |category| category["Name"] },
+          Array(descriptor["JobGrade"]).map { |grade| grade["Code"] },
+          Array(descriptor["PositionSchedule"]).map { |schedule| schedule["Name"] },
+          Array(descriptor["PositionOfferingType"]).map { |type| type["Name"] },
+          details.dig("WhoMayApply", "Name")
+        ].flatten.compact.reject(&:empty?).uniq
+      end
+
+      def description_html(descriptor, details)
+        sections = [
+          ["Summary", details["JobSummary"]],
+          ["Duties", details["MajorDuties"]],
+          ["Qualifications", descriptor["QualificationSummary"]],
+          ["Education", details["Education"]],
+          ["Requirements", details["Requirements"]],
+          ["How to apply", details["HowToApply"]],
+          ["Required documents", details["RequiredDocuments"]],
+          ["Benefits", details["Benefits"]],
+          ["Other information", details["OtherInformation"]]
+        ]
+
+        sections.filter_map do |title, body|
+          body = body.to_s.strip
+          next if body.empty?
+
+          "<h3>#{escape_html(title)}</h3>#{paragraphs(body)}"
+        end.join("\n")
+      end
+
+      def paragraphs(value)
+        value.to_s.split(/\n{2,}/).map do |paragraph|
+          "<p>#{escape_html(paragraph).gsub(/\n/, "<br>")}</p>"
+        end.join
+      end
+
+      def escape_html(value)
+        value.to_s
+          .gsub("&", "&amp;")
+          .gsub("<", "&lt;")
+          .gsub(">", "&gt;")
+          .gsub('"', "&quot;")
+          .gsub("'", "&#39;")
+      end
+    end
+
+    class ReedCoUk < Base
+      QUERIES = [
+        "software engineer",
+        "software developer",
+        "data scientist",
+        "data analyst",
+        "devops",
+        "cloud engineer",
+        "product manager",
+        "designer"
+      ].freeze
+
+      def name = "reedcouk"
+
+      def fetch
+        queries.flat_map do |query|
+          fetch_query(keyword: query, skip: 0)
+        end.uniq { |job| job.fetch(:source_key) }
+      end
+
+      def fetch_query(keyword:, skip:)
+        return [] unless configured?
+
+        params = {
+          "keywords" => keyword,
+          "resultsToTake" => ENV.fetch("REED_RESULTS_TO_TAKE", "100"),
+          "resultsToSkip" => skip
+        }
+
+        payload = reed_get_json("https://www.reed.co.uk/api/1.0/search?#{URI.encode_www_form(params)}")
+        Array(payload["results"]).map { |job| normalize(job) }
+      end
+
+      private
+
+      def queries
+        ENV.fetch("REED_QUERIES", QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def configured?
+        ENV["REED_API_KEY"].to_s.strip != ""
+      end
+
+      def reed_get_json(url)
+        uri = URI(url)
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 30) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = USER_AGENT
+          request["Accept"] = "application/json"
+          request["Authorization"] = "Basic #{Base64.strict_encode64("#{ENV.fetch("REED_API_KEY")}:")}"
+          http.request(request)
+        end
+
+        raise RateLimited, "Reed.co.uk rate limited" if response.code.to_i == 429
+        raise "HTTP #{response.code} for #{url}" unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)
+      end
+
+      def normalize(job)
+        {
+          source_key: source_key(job["jobId"], job["jobUrl"]),
+          title: job.fetch("jobTitle"),
+          company: job["employerName"],
+          location: job["locationName"],
+          remote: remote?(job),
+          employment_type: [job["contractType"], job["jobType"]].compact.reject(&:empty?).uniq.join(", "),
+          category: nil,
+          salary: salary_text(job),
+          source_url: job["externalUrl"] || job["jobUrl"] || "https://www.reed.co.uk/jobs/#{job["jobId"]}",
+          published_at: parse_time(job["date"]),
+          tags: [job["contractType"], job["jobType"]].compact.reject(&:empty?).uniq,
+          description: html_description(job["jobDescription"]),
+          raw: job
+        }
+      end
+
+      def salary_text(job)
+        currency = job["currency"].to_s.strip
+        salary_type = job["salaryType"].to_s.strip
+        min = job["minimumSalary"] || job["yearlyMinimumSalary"]
+        max = job["maximumSalary"] || job["yearlyMaximumSalary"]
+        range = [min, max].compact.map(&:to_s).reject(&:empty?).uniq.join(" - ")
+        [currency, range, salary_type].reject(&:empty?).join(" ")
+      end
+
+      def remote?(job)
+        [job["locationName"], job["jobTitle"], job["jobDescription"]].compact.join(" ").match?(/\b(remote|work from home|hybrid)\b/i)
       end
     end
 

@@ -42,6 +42,17 @@ class StandaloneSourceFetchWorker
       category = params[:category]
       category = nil if category.to_s.empty?
       Standalone::Sources::TheMuse.new.send(:fetch_pages, start_page: Integer(params.fetch(:page)), max_pages: 1, category: category).fetch(:jobs)
+    when "usajobs"
+      Standalone::Sources::UsaJobs.new.fetch_query(
+        keyword: params.fetch(:keyword),
+        page: Integer(params.fetch(:page, 1)),
+        remote: params[:remote].to_s == "true"
+      )
+    when "reedcouk"
+      Standalone::Sources::ReedCoUk.new.fetch_query(
+        keyword: params.fetch(:keyword),
+        skip: Integer(params.fetch(:skip, 0))
+      )
     when "remotejobs"
       Standalone::Sources::RemoteJobs.new.send(:fetch_pages, offset: Integer(params.fetch(:offset)), max_pages: 1).fetch(:jobs)
     when "himalayas"

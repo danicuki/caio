@@ -43,6 +43,8 @@ class SourceFanoutWorker
     typeform workable
   ].freeze
 
+  USAJOBS_QUERIES = Standalone::Sources::UsaJobs::QUERIES.freeze
+  REED_QUERIES = Standalone::Sources::ReedCoUk::QUERIES.freeze
   HIMALAYAS_SEARCH_QUERIES = Standalone::Sources::HimalayasSearch::QUERIES.freeze
   HIMALAYAS_SEARCH_COUNTRIES = Standalone::Sources::HimalayasSearch::COUNTRIES.freeze
   GETONBRD_QUERIES = Standalone::Sources::GetOnBoard::QUERIES.freeze
@@ -54,8 +56,9 @@ class SourceFanoutWorker
 
     enqueue_static_sources
     enqueue_jobicy
-    enqueue_web3career
+    enqueue_public_government_sources
     enqueue_public_marketplaces
+    enqueue_web3career
     enqueue_company_boards
     enqueue_company_name_ats_probes
     enqueue_new_ats_sources
@@ -124,6 +127,37 @@ class SourceFanoutWorker
       end
     end
 
+  end
+
+  def enqueue_public_government_sources
+    enqueue_usajobs
+    enqueue_reedcouk
+  end
+
+  def enqueue_usajobs
+    return unless usajobs_configured?
+    return unless source_yield_allowed?("usajobs")
+
+    usajobs_queries.each do |query|
+      Integer(ENV.fetch("USAJOBS_SOURCE_PAGES_PER_QUERY", "2")).times do |index|
+        page = index + 1
+        enqueue_source("usajobs", { "keyword" => query, "page" => page })
+        enqueue_source("usajobs", { "keyword" => query, "page" => page, "remote" => "true" })
+      end
+    end
+  end
+
+  def enqueue_reedcouk
+    return unless reed_configured?
+    return unless source_yield_allowed?("reedcouk")
+
+    results_to_take = Integer(ENV.fetch("REED_RESULTS_TO_TAKE", "100"))
+
+    reed_queries.each do |query|
+      Integer(ENV.fetch("REED_SOURCE_PAGES_PER_QUERY", "2")).times do |index|
+        enqueue_source("reedcouk", { "keyword" => query, "skip" => index * results_to_take })
+      end
+    end
   end
 
   def enqueue_company_boards
@@ -379,6 +413,22 @@ class SourceFanoutWorker
 
   def getonbrd_queries
     ENV.fetch("GETONBRD_QUERIES", GETONBRD_QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def usajobs_queries
+    ENV.fetch("USAJOBS_QUERIES", USAJOBS_QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def reed_queries
+    ENV.fetch("REED_QUERIES", REED_QUERIES.join(",")).split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def usajobs_configured?
+    ENV["USAJOBS_API_KEY"].to_s.strip != "" && ENV["USAJOBS_USER_AGENT"].to_s.strip != ""
+  end
+
+  def reed_configured?
+    ENV["REED_API_KEY"].to_s.strip != ""
   end
 
   def discovered(pattern)
