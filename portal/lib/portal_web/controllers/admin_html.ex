@@ -47,7 +47,7 @@ defmodule PortalWeb.AdminHTML do
   def bar_width(value, max_value) do
     width =
       if to_number(max_value) <= 0 do
-        0
+        0.0
       else
         to_number(value) / to_number(max_value) * 100
       end
