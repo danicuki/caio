@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh Caio company and homepage stats
+After=caio-portal.service
+Requires=caio-portal.service
+
+[Service]
+Type=oneshot
+User=caio
+Group=caio
+WorkingDirectory=/srv/caio/portal
+EnvironmentFile=/etc/caio/caio.env
+ExecStart=/srv/caio/portal/_build/prod/rel/portal/bin/portal rpc 'result = Portal.Jobs.refresh_companies(); if :ets.whereis(:portal_home_jobs_cache) != :undefined, do: :ets.delete(:portal_home_jobs_cache, :snapshot), else: :ok; IO.inspect(result)'

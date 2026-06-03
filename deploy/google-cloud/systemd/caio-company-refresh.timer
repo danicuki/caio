@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Caio company and homepage stats every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+AccuracySec=1min
+Unit=caio-company-refresh.service
+
+[Install]
+WantedBy=timers.target

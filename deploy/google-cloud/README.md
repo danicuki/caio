@@ -138,13 +138,14 @@ As root:
 
 ```sh
 sudo cp deploy/google-cloud/systemd/*.service /etc/systemd/system/
+sudo cp deploy/google-cloud/systemd/*.timer /etc/systemd/system/
 sudo cp deploy/google-cloud/Caddyfile /etc/caddy/Caddyfile
 sudo systemctl daemon-reload
 sudo systemctl enable --now redis-server
 sudo systemctl enable --now caddy
 sudo systemctl enable --now caio-portal
 sudo systemctl enable --now caio-sidekiq-writer caio-sidekiq-fetch caio-sidekiq-sources
-sudo systemctl enable --now caio-crawler-scheduler.timer caio-sqlite-backup.timer
+sudo systemctl enable --now caio-crawler-scheduler.timer caio-company-refresh.timer caio-sqlite-backup.timer
 ```
 
 Check status:
@@ -173,6 +174,7 @@ MIX_ENV=prod mix release --overwrite
 
 exit
 sudo systemctl restart caio-portal caio-sidekiq-writer caio-sidekiq-fetch caio-sidekiq-sources
+sudo systemctl restart caio-company-refresh.timer
 ```
 
 ## Backups
