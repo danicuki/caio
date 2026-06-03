@@ -1584,24 +1584,58 @@ module Standalone
           ["Qualifications", descriptor["QualificationSummary"]],
           ["Education", details["Education"]],
           ["Requirements", details["Requirements"]],
+          ["Key requirements", details["KeyRequirements"]],
+          ["Evaluations", details["Evaluations"]],
           ["How to apply", details["HowToApply"]],
+          ["What to expect next", details["WhatToExpectNext"]],
           ["Required documents", details["RequiredDocuments"]],
           ["Benefits", details["Benefits"]],
           ["Other information", details["OtherInformation"]]
         ]
 
         sections.filter_map do |title, body|
-          body = body.to_s.strip
-          next if body.empty?
+          html = rich_body_html(body)
+          next if html.empty?
 
-          "<h3>#{escape_html(title)}</h3>#{paragraphs(body)}"
+          "<h3>#{escape_html(title)}</h3>#{html}"
         end.join("\n")
       end
 
-      def paragraphs(value)
-        value.to_s.split(/\n{2,}/).map do |paragraph|
+      def rich_body_html(value)
+        list = list_value(value)
+        return list_html(list) if list
+
+        text = value.to_s.strip
+        return "" if text.empty?
+
+        lines = text.lines.map(&:strip).reject(&:empty?)
+        if lines.length > 1 && lines.all? { |line| line.match?(/\A(?:[-*]|\u2022)\s+/) }
+          return list_html(lines.map { |line| line.sub(/\A(?:[-*]|\u2022)\s+/, "") })
+        end
+
+        text.split(/\n{2,}/).map do |paragraph|
           "<p>#{escape_html(paragraph).gsub(/\n/, "<br>")}</p>"
         end.join
+      end
+
+      def list_value(value)
+        return value if value.is_a?(Array)
+        return nil unless value.is_a?(String)
+
+        text = value.strip
+        return nil unless text.start_with?("[") && text.end_with?("]")
+
+        parsed = JSON.parse(text)
+        parsed if parsed.is_a?(Array)
+      rescue JSON::ParserError
+        nil
+      end
+
+      def list_html(values)
+        items = values.map { |item| item.to_s.strip }.reject(&:empty?)
+        return "" if items.empty?
+
+        "<ul>#{items.map { |item| "<li>#{escape_html(item)}</li>" }.join}</ul>"
       end
 
       def escape_html(value)
@@ -1644,7 +1678,7 @@ module Standalone
         }
 
         payload = reed_get_json("https://www.reed.co.uk/api/1.0/search?#{URI.encode_www_form(params)}")
-        Array(payload["results"]).map { |job| normalize(job) }
+        Array(payload["results"]).map { |job| normalize(with_details(job)) }
       end
 
       private
@@ -1655,6 +1689,16 @@ module Standalone
 
       def configured?
         ENV["REED_API_KEY"].to_s.strip != ""
+      end
+
+      def with_details(job)
+        return job unless ENV.fetch("REED_FETCH_DETAILS", "true") == "true"
+
+        detail = reed_get_json("https://www.reed.co.uk/api/1.0/jobs/#{job.fetch("jobId")}")
+        detail.empty? ? job : job.merge(detail)
+      rescue StandardError => e
+        warn "reed detail failed job_id=#{job["jobId"].inspect}: #{e.class}: #{e.message}"
+        job
       end
 
       def reed_get_json(url)
