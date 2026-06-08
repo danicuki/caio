@@ -20,6 +20,8 @@ defmodule PortalWeb.PageHTML do
 
   def meta_description(assigns), do: assigns[:meta_description] || @default_description
 
+  def robots(assigns), do: assigns[:robots]
+
   def canonical_url(assigns) do
     path = assigns[:canonical_path] || current_path(assigns)
     absolute_url(path)

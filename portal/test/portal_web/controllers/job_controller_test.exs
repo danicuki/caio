@@ -244,6 +244,7 @@ defmodule PortalWeb.JobControllerTest do
     assert response =~
              ~s(<link rel="canonical" href="https://caio-jobs.com/jobs?q=docker&amp;location=Lisbon")
 
+    assert response =~ ~s(<meta name="robots" content="noindex,follow")
     assert response =~ "Search"
     assert response =~ "docker jobs in Lisbon"
     assert response =~ ~s("SearchResultsPage")

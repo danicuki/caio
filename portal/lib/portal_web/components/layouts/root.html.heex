@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content={PortalWeb.PageHTML.meta_description(assigns)} />
+    <%= if robots = PortalWeb.PageHTML.robots(assigns) do %>
+      <meta name="robots" content={robots} />
+    <% end %>
     <meta name="theme-color" content="#0E5C49" />
     <link rel="canonical" href={PortalWeb.PageHTML.canonical_url(assigns)} />
     <meta property="og:site_name" content="Caio" />

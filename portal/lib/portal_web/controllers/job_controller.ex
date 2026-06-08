@@ -36,6 +36,7 @@ defmodule PortalWeb.JobController do
         page_title: search_page_title(params),
         meta_description: search_meta_description(params, total),
         canonical_path: search_canonical_path(params),
+        robots: search_robots(params),
         json_ld: search_json_ld(params, total),
         analytics_distinct_id: analytics_id(conn, lead),
         jobs: jobs,
@@ -68,7 +69,9 @@ defmodule PortalWeb.JobController do
       has_salary: not is_nil(PortalWeb.JobHTML.salary(job))
     })
 
-    render(conn, :show,
+    conn
+    |> put_resp_header("cache-tag", job_cache_tags(job))
+    |> render(:show,
       page_title: job_page_title(job),
       meta_description: job_meta_description(job),
       canonical_path: ~p"/jobs/#{job.id}",
@@ -201,6 +204,14 @@ defmodule PortalWeb.JobController do
     if query == "", do: "/jobs", else: "/jobs?#{query}"
   end
 
+  defp search_robots(params) do
+    index_affecting_keys = ~w(q role company location seniority workplace salary perk order)
+    has_filters? = Enum.any?(index_affecting_keys, &(clean_param(params[&1]) != nil))
+    paginated? = Jobs.page(params) > 1
+
+    if has_filters? or paginated?, do: "noindex,follow"
+  end
+
   defp search_subject(params) do
     clean_param(params["q"]) || clean_param(params["role"]) || "tech"
   end
@@ -322,6 +333,18 @@ defmodule PortalWeb.JobController do
   end
 
   defp job_page_title(job), do: "#{job.title} at #{job.company || "a tech company"}"
+
+  defp job_cache_tags(job) do
+    ["jobs", "job-#{job.id}", company_cache_tag(job)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(",")
+  end
+
+  defp company_cache_tag(%{company_id: company_id}) when company_id not in [nil, ""] do
+    "company-#{company_id}"
+  end
+
+  defp company_cache_tag(_job), do: nil
 
   defp job_meta_description(job) do
     location = PortalWeb.JobHTML.compact_location(job)

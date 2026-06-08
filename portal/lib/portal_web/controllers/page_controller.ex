@@ -3,6 +3,8 @@ defmodule PortalWeb.PageController do
 
   alias Portal.{Accounts, Analytics, Jobs}
 
+  @sitemap_cache_control "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+
   def home(conn, _params) do
     conn = ensure_session_token(conn)
     snapshot = Jobs.home_snapshot(6)
@@ -32,25 +34,21 @@ defmodule PortalWeb.PageController do
   end
 
   def sitemap(conn, _params) do
-    body =
+    entries =
       [
-        ~s(<?xml version="1.0" encoding="UTF-8"?>),
-        ~s(<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">),
-        "  <sitemap><loc>https://caio-jobs.com/sitemap-static.xml</loc></sitemap>",
-        "  <sitemap><loc>https://caio-jobs.com/sitemap-companies.xml</loc></sitemap>",
-        "  <sitemap><loc>https://caio-jobs.com/sitemap-locations.xml</loc></sitemap>",
-        "  <sitemap><loc>https://caio-jobs.com/sitemap-keywords.xml</loc></sitemap>",
-        "</sitemapindex>"
-      ]
-      |> Enum.join("\n")
+        "https://caio-jobs.com/sitemap-static.xml",
+        "https://caio-jobs.com/sitemap-companies.xml"
+      ] ++ job_sitemap_entries()
 
-    conn
-    |> put_resp_content_type("application/xml")
-    |> text(body)
+    render_sitemap_index(conn, entries, ["sitemap-root"])
   end
 
   def sitemap_static(conn, _params) do
-    urls = [
+    render_urlset(conn, static_sitemap_urls())
+  end
+
+  defp static_sitemap_urls do
+    [
       "/",
       "/jobs",
       "/about",
@@ -64,21 +62,49 @@ defmodule PortalWeb.PageController do
       "/startup-jobs",
       "/top-skills"
     ]
-
-    render_urlset(conn, Enum.map(urls, &%{loc: "https://caio-jobs.com#{&1}"}))
+    |> Enum.map(&%{loc: "https://caio-jobs.com#{&1}"})
   end
 
   def sitemap_companies(conn, _params) do
-    urls =
-      Jobs.sitemap_companies()
-      |> Enum.map(fn company ->
-        %{
-          loc: "https://caio-jobs.com/companies/#{company.slug}",
-          lastmod: company.latest_posted_at
-        }
-      end)
+    render_urlset(conn, company_sitemap_urls())
+  end
 
-    render_urlset(conn, urls)
+  defp company_sitemap_urls do
+    Jobs.sitemap_companies()
+    |> Enum.map(fn company ->
+      %{
+        loc: "https://caio-jobs.com/companies/#{company.slug}",
+        lastmod: company.latest_posted_at
+      }
+    end)
+  end
+
+  defp job_sitemap_entries do
+    Jobs.job_sitemap_ranges()
+    |> Enum.map(fn %{first_id: first_id, last_id: last_id} ->
+      "https://caio-jobs.com/sitemap-jobs-#{first_id}-#{last_id}.xml"
+    end)
+  end
+
+  def sitemap_jobs(conn, %{"range" => range}) do
+    case parse_sitemap_job_range(range) do
+      {:ok, first_id, last_id} ->
+        urls =
+          Jobs.sitemap_jobs_in_id_range(first_id, last_id)
+          |> Enum.map(fn job ->
+            %{
+              loc: "https://caio-jobs.com/jobs/#{job.id}",
+              lastmod: job.updated_at || job.published_at
+            }
+          end)
+
+        render_urlset(conn, urls, ["sitemap-jobs", "sitemap-jobs-#{first_id}-#{last_id}"])
+
+      :error ->
+        conn
+        |> put_status(:not_found)
+        |> render_urlset([], ["sitemap-jobs"])
+    end
   end
 
   def sitemap_location_redirect(conn, _params) do
@@ -387,7 +413,21 @@ defmodule PortalWeb.PageController do
     )
   end
 
-  defp render_urlset(conn, urls) do
+  defp render_sitemap_index(conn, entries, tags) do
+    body =
+      [
+        ~s(<?xml version="1.0" encoding="UTF-8"?>),
+        ~s(<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">),
+        Enum.map(entries, &sitemap_entry/1),
+        "</sitemapindex>"
+      ]
+      |> List.flatten()
+      |> Enum.join("\n")
+
+    render_xml(conn, body, ["sitemap" | tags])
+  end
+
+  defp render_urlset(conn, urls, tags \\ ["sitemap-urlset"]) do
     body =
       [
         ~s(<?xml version="1.0" encoding="UTF-8"?>),
@@ -398,9 +438,32 @@ defmodule PortalWeb.PageController do
       |> List.flatten()
       |> Enum.join("\n")
 
+    render_xml(conn, body, ["sitemap" | tags])
+  end
+
+  defp render_xml(conn, body, tags) do
     conn
+    |> put_resp_header("cache-control", @sitemap_cache_control)
+    |> put_resp_header("cache-tag", tags |> Enum.uniq() |> Enum.join(","))
     |> put_resp_content_type("application/xml")
     |> text(body)
+  end
+
+  defp sitemap_entry(loc), do: "  <sitemap><loc>#{xml_escape(loc)}</loc></sitemap>"
+
+  defp parse_sitemap_job_range(range) do
+    range = String.trim_trailing(range, ".xml")
+
+    with [first_id, last_id] <- String.split(range, "-", parts: 2),
+         {first_id, ""} <- Integer.parse(first_id),
+         {last_id, ""} <- Integer.parse(last_id),
+         true <- first_id > 0,
+         true <- last_id >= first_id,
+         true <- last_id - first_id + 1 <= Jobs.job_sitemap_range_size() do
+      {:ok, first_id, last_id}
+    else
+      _ -> :error
+    end
   end
 
   defp sitemap_url(%{loc: loc} = url) do

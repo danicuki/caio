@@ -10,6 +10,7 @@ defmodule Portal.Jobs do
   @guest_preview 18
   @member_limit 50
   @browse_result_limit 10_000
+  @job_sitemap_range_size 10_000
   @sitemap_url_limit 50_000
   @sitemap_refresh_opts [timeout: :infinity]
   @home_cache_table :portal_home_jobs_cache
@@ -266,6 +267,39 @@ defmodule Portal.Jobs do
       |> Repo.all()
 
     if rows == [], do: legacy_sitemap_companies(limit), else: rows
+  end
+
+  def job_sitemap_range_size, do: @job_sitemap_range_size
+
+  def job_sitemap_ranges(range_size \\ @job_sitemap_range_size) do
+    max_id = max_job_post_id()
+
+    if max_id <= 0 do
+      []
+    else
+      1
+      |> Stream.iterate(&(&1 + range_size))
+      |> Enum.take_while(&(&1 <= max_id))
+      |> Enum.map(fn first_id ->
+        %{first_id: first_id, last_id: first_id + range_size - 1}
+      end)
+    end
+  end
+
+  def sitemap_jobs_in_id_range(first_id, last_id) do
+    first_id = max(first_id, 1)
+    last_id = min(max(last_id, first_id), first_id + @job_sitemap_range_size - 1)
+
+    JobPost
+    |> public_scope()
+    |> where([j], j.id >= ^first_id and j.id <= ^last_id)
+    |> limit(^@job_sitemap_range_size)
+    |> select([j], %{
+      id: j.id,
+      published_at: j.published_at,
+      updated_at: j.updated_at
+    })
+    |> Repo.all()
   end
 
   def sitemap_locations(limit \\ @sitemap_url_limit) do
@@ -1198,6 +1232,12 @@ defmodule Portal.Jobs do
     Date.utc_today()
     |> Date.add(-183)
     |> Date.to_iso8601()
+  end
+
+  defp max_job_post_id do
+    JobPost
+    |> select([j], max(j.id))
+    |> Repo.one() || 0
   end
 
   defp normalize_company(company) do

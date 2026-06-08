@@ -33,6 +33,7 @@ defmodule PortalWeb.Router do
     get "/sitemap.xml", PageController, :sitemap
     get "/sitemap-static.xml", PageController, :sitemap_static
     get "/sitemap-companies.xml", PageController, :sitemap_companies
+    get "/sitemap-jobs-:range", PageController, :sitemap_jobs
     get "/sitemap-location.xml", PageController, :sitemap_location_redirect
     get "/sitemap-locations.xml", PageController, :sitemap_locations
     get "/sitemap-keywords.xml", PageController, :sitemap_keywords
