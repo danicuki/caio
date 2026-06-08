@@ -131,16 +131,18 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /sitemap-jobs range lists canonical job detail pages", %{conn: conn} do
-    job = insert_company_job("Caio Labs")
+    first_job = insert_company_job("Caio Labs", %{id: 20_274})
+    last_job = insert_company_job("Caio Labs", %{id: 36_573})
 
-    conn = get(conn, "/sitemap-jobs-#{job.id}-#{job.id}.xml")
+    conn = get(conn, "/sitemap-jobs-#{first_job.id}-#{last_job.id}.xml")
     response = response(conn, 200)
 
-    assert response =~ "https://caio-jobs.com/jobs/#{job.id}"
+    assert response =~ "https://caio-jobs.com/jobs/#{first_job.id}"
+    assert response =~ "https://caio-jobs.com/jobs/#{last_job.id}"
     assert response =~ Date.to_iso8601(Date.utc_today())
 
     assert get_resp_header(conn, "cache-tag") == [
-             "sitemap,sitemap-jobs,sitemap-jobs-#{job.id}-#{job.id}"
+             "sitemap,sitemap-jobs,sitemap-jobs-#{first_job.id}-#{last_job.id}"
            ]
   end
 

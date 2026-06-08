@@ -295,7 +295,7 @@ defmodule Portal.Jobs do
 
   def sitemap_jobs_in_id_range(first_id, last_id) do
     first_id = max(first_id, 1)
-    last_id = min(max(last_id, first_id), first_id + @job_sitemap_range_size - 1)
+    last_id = max(last_id, first_id)
 
     JobPost
     |> public_scope()
