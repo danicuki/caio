@@ -88,18 +88,16 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /sitemap.xml lists core launch pages", %{conn: conn} do
-    job = insert_company_job("Caio Labs")
-
-    first_id =
-      div(job.id - 1, Portal.Jobs.job_sitemap_range_size()) * Portal.Jobs.job_sitemap_range_size() +
-        1
+    job = insert_company_job("Caio Labs", %{id: 51_580_001})
 
     conn = get(conn, "/sitemap.xml")
     response = response(conn, 200)
 
     assert response =~ "https://caio-jobs.com/sitemap-static.xml"
     assert response =~ "https://caio-jobs.com/sitemap-companies.xml"
-    assert response =~ "https://caio-jobs.com/sitemap-jobs-#{first_id}-#{job.id}.xml"
+    assert response =~ "https://caio-jobs.com/sitemap-jobs-#{job.id}-#{job.id}.xml"
+    refute response =~ "https://caio-jobs.com/sitemap-jobs-1-10000.xml"
+    refute response =~ "https://caio-jobs.com/sitemap-jobs-51580001-51590000.xml"
     refute response =~ "https://caio-jobs.com/sitemap-locations.xml"
     refute response =~ "https://caio-jobs.com/sitemap-keywords.xml"
 
@@ -135,12 +133,15 @@ defmodule PortalWeb.PageControllerTest do
   test "GET /sitemap-jobs range lists canonical job detail pages", %{conn: conn} do
     job = insert_company_job("Caio Labs")
 
-    conn = get(conn, "/sitemap-jobs-1-10000.xml")
+    conn = get(conn, "/sitemap-jobs-#{job.id}-#{job.id}.xml")
     response = response(conn, 200)
 
     assert response =~ "https://caio-jobs.com/jobs/#{job.id}"
     assert response =~ Date.to_iso8601(Date.utc_today())
-    assert get_resp_header(conn, "cache-tag") == ["sitemap,sitemap-jobs,sitemap-jobs-1-10000"]
+
+    assert get_resp_header(conn, "cache-tag") == [
+             "sitemap,sitemap-jobs,sitemap-jobs-#{job.id}-#{job.id}"
+           ]
   end
 
   test "GET /sitemap-locations.xml lists city search pages", %{conn: conn} do

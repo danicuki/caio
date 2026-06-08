@@ -272,18 +272,25 @@ defmodule Portal.Jobs do
   def job_sitemap_range_size, do: @job_sitemap_range_size
 
   def job_sitemap_ranges(range_size \\ @job_sitemap_range_size) do
-    max_id = max_job_post_id()
+    ranked_jobs =
+      JobPost
+      |> public_scope()
+      |> select([j], %{
+        id: j.id,
+        chunk:
+          fragment(
+            "CAST(((ROW_NUMBER() OVER (ORDER BY ?)) - 1) / ? AS INTEGER)",
+            j.id,
+            ^range_size
+          )
+      })
 
-    if max_id <= 0 do
-      []
-    else
-      1
-      |> Stream.iterate(&(&1 + range_size))
-      |> Enum.take_while(&(&1 <= max_id))
-      |> Enum.map(fn first_id ->
-        %{first_id: first_id, last_id: min(first_id + range_size - 1, max_id)}
-      end)
-    end
+    from(j in subquery(ranked_jobs),
+      group_by: j.chunk,
+      order_by: j.chunk,
+      select: %{first_id: min(j.id), last_id: max(j.id)}
+    )
+    |> Repo.all()
   end
 
   def sitemap_jobs_in_id_range(first_id, last_id) do
@@ -1232,12 +1239,6 @@ defmodule Portal.Jobs do
     Date.utc_today()
     |> Date.add(-183)
     |> Date.to_iso8601()
-  end
-
-  defp max_job_post_id do
-    JobPost
-    |> select([j], max(j.id))
-    |> Repo.one() || 0
   end
 
   defp normalize_company(company) do

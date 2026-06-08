@@ -458,8 +458,7 @@ defmodule PortalWeb.PageController do
          {first_id, ""} <- Integer.parse(first_id),
          {last_id, ""} <- Integer.parse(last_id),
          true <- first_id > 0,
-         true <- last_id >= first_id,
-         true <- last_id - first_id + 1 <= Jobs.job_sitemap_range_size() do
+         true <- last_id >= first_id do
       {:ok, first_id, last_id}
     else
       _ -> :error
