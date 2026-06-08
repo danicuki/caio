@@ -30,6 +30,7 @@ defmodule PortalWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/robots.txt", PageController, :robots
     get "/sitemap.xml", PageController, :sitemap
     get "/sitemap-static.xml", PageController, :sitemap_static
     get "/sitemap-companies.xml", PageController, :sitemap_companies

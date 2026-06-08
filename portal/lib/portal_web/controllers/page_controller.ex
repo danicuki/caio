@@ -34,13 +34,26 @@ defmodule PortalWeb.PageController do
   end
 
   def sitemap(conn, _params) do
-    entries =
-      [
-        "https://caio-jobs.com/sitemap-static.xml",
-        "https://caio-jobs.com/sitemap-companies.xml"
-      ] ++ job_sitemap_entries()
+    render_sitemap_index(conn, sitemap_index_entries(), ["sitemap-root"])
+  end
 
-    render_sitemap_index(conn, entries, ["sitemap-root"])
+  def robots(conn, _params) do
+    body =
+      [
+        "User-agent: *",
+        "Allow: /",
+        "",
+        "Sitemap: https://caio-jobs.com/sitemap.xml",
+        sitemap_index_entries()
+        |> Enum.map(&"Sitemap: #{&1}")
+      ]
+      |> List.flatten()
+      |> Enum.join("\n")
+
+    conn
+    |> put_resp_header("cache-control", @sitemap_cache_control)
+    |> put_resp_content_type("text/plain")
+    |> text(body)
   end
 
   def sitemap_static(conn, _params) do
@@ -84,6 +97,13 @@ defmodule PortalWeb.PageController do
     |> Enum.map(fn %{first_id: first_id, last_id: last_id} ->
       "https://caio-jobs.com/sitemap-jobs-#{first_id}-#{last_id}.xml"
     end)
+  end
+
+  defp sitemap_index_entries do
+    [
+      "https://caio-jobs.com/sitemap-static.xml",
+      "https://caio-jobs.com/sitemap-companies.xml"
+    ] ++ job_sitemap_entries()
   end
 
   def sitemap_jobs(conn, %{"range" => range}) do

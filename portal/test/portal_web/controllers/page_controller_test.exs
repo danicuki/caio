@@ -83,8 +83,15 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /robots.txt exposes the sitemap", %{conn: conn} do
+    job = insert_company_job("Caio Labs", %{id: 51_580_001})
+
     conn = get(conn, "/robots.txt")
-    assert text_response(conn, 200) =~ "Sitemap: https://caio-jobs.com/sitemap.xml"
+    response = text_response(conn, 200)
+
+    assert response =~ "Sitemap: https://caio-jobs.com/sitemap.xml"
+    assert response =~ "Sitemap: https://caio-jobs.com/sitemap-static.xml"
+    assert response =~ "Sitemap: https://caio-jobs.com/sitemap-companies.xml"
+    assert response =~ "Sitemap: https://caio-jobs.com/sitemap-jobs-#{job.id}-#{job.id}.xml"
   end
 
   test "GET /sitemap.xml lists core launch pages", %{conn: conn} do
