@@ -196,7 +196,7 @@ defmodule PortalWeb.JobHTML do
         <input type="hidden" name="lead[return_to]" value={@return_to} />
       <% end %>
       <div class="social-row" aria-label="Social sign in options">
-        <a href={github_auth_path(@return_to, @action)}>Continue with GitHub</a>
+        <a href={github_auth_path(@return_to, @action)} rel="nofollow">Continue with GitHub</a>
       </div>
       <div class="form-divider"><span>or</span></div>
       <label>

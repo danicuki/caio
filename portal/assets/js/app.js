@@ -138,8 +138,13 @@ if (posthogConfig?.apiKey) {
 
   posthog.init(posthogConfig.apiKey, {
     api_host: posthogConfig.apiHost,
-    autocapture: true,
-    capture_pageview: true,
+    autocapture: posthogConfig.autocapture === true,
+    capture_pageview: posthogConfig.capturePageview === true,
+    capture_pageleave: false,
+    capture_dead_clicks: false,
+    capture_performance: false,
+    rageclick: false,
+    disable_surveys: true,
     mask_all_element_attributes: true,
     mask_personal_data_properties: true,
     session_recording: {

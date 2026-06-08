@@ -3,6 +3,16 @@ defmodule Portal.Analytics do
 
   require Logger
 
+  @high_volume_events MapSet.new([
+                        "home_viewed",
+                        "jobs_search_viewed",
+                        "job_detail_viewed",
+                        "company_profile_viewed",
+                        "static_page_viewed",
+                        "acquisition_page_viewed",
+                        "github_login_started"
+                      ])
+
   def browser_config do
     config = config()
 
@@ -10,6 +20,8 @@ defmodule Portal.Analytics do
       %{
         apiKey: config[:public_key],
         apiHost: config[:host],
+        autocapture: config[:autocapture],
+        capturePageview: config[:capture_pageview],
         sessionReplay: config[:session_replay]
       }
     end
@@ -22,7 +34,7 @@ defmodule Portal.Analytics do
   def capture(event, distinct_id, properties) when is_binary(event) do
     config = config()
 
-    if enabled?(config) do
+    if enabled?(config) and capture_event?(event, config) do
       payload = %{
         api_key: config[:public_key],
         event: event,
@@ -39,6 +51,10 @@ defmodule Portal.Analytics do
   defp config, do: Application.get_env(:portal, :posthog, [])
 
   defp enabled?(config), do: config[:enabled] && present?(config[:public_key])
+
+  defp capture_event?(event, config) do
+    config[:capture_high_volume_events] || not MapSet.member?(@high_volume_events, event)
+  end
 
   defp post_capture(host, payload) do
     url = String.trim_trailing(host || "https://us.i.posthog.com", "/") <> "/capture/"

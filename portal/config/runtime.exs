@@ -27,6 +27,11 @@ config :portal, :posthog,
   public_key: System.get_env("POSTHOG_PUBLIC_KEY"),
   host: System.get_env("POSTHOG_HOST", "https://us.i.posthog.com"),
   enabled: System.get_env("POSTHOG_ENABLED", "false") in ["1", "true", "TRUE", "yes"],
+  autocapture: System.get_env("POSTHOG_AUTOCAPTURE", "false") in ["1", "true", "TRUE", "yes"],
+  capture_pageview:
+    System.get_env("POSTHOG_CAPTURE_PAGEVIEW", "true") in ["1", "true", "TRUE", "yes"],
+  capture_high_volume_events:
+    System.get_env("POSTHOG_CAPTURE_HIGH_VOLUME_EVENTS", "false") in ["1", "true", "TRUE", "yes"],
   session_replay: System.get_env("POSTHOG_SESSION_REPLAY", "true") in ["1", "true", "TRUE", "yes"]
 
 config :portal, :founder_chat,
