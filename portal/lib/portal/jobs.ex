@@ -281,7 +281,7 @@ defmodule Portal.Jobs do
       |> Stream.iterate(&(&1 + range_size))
       |> Enum.take_while(&(&1 <= max_id))
       |> Enum.map(fn first_id ->
-        %{first_id: first_id, last_id: first_id + range_size - 1}
+        %{first_id: first_id, last_id: min(first_id + range_size - 1, max_id)}
       end)
     end
   end

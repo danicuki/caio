@@ -88,14 +88,18 @@ defmodule PortalWeb.PageControllerTest do
   end
 
   test "GET /sitemap.xml lists core launch pages", %{conn: conn} do
-    insert_company_job("Caio Labs")
+    job = insert_company_job("Caio Labs")
+
+    first_id =
+      div(job.id - 1, Portal.Jobs.job_sitemap_range_size()) * Portal.Jobs.job_sitemap_range_size() +
+        1
 
     conn = get(conn, "/sitemap.xml")
     response = response(conn, 200)
 
     assert response =~ "https://caio-jobs.com/sitemap-static.xml"
     assert response =~ "https://caio-jobs.com/sitemap-companies.xml"
-    assert response =~ "https://caio-jobs.com/sitemap-jobs-1-10000.xml"
+    assert response =~ "https://caio-jobs.com/sitemap-jobs-#{first_id}-#{job.id}.xml"
     refute response =~ "https://caio-jobs.com/sitemap-locations.xml"
     refute response =~ "https://caio-jobs.com/sitemap-keywords.xml"
 
