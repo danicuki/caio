@@ -75,6 +75,18 @@ class JobPostImportWorker
       skipped_count: stats.skipped_count,
       created_at: Time.current
     )
+  rescue JobBatchSpool::MissingSpoolFile => e
+    SourceRun.create!(
+      source: source,
+      status: "import_spool_missing",
+      fetched_count: 0,
+      imported_count: 0,
+      inserted_count: 0,
+      updated_count: 0,
+      skipped_count: 0,
+      error_message: e.message,
+      created_at: Time.current
+    )
   rescue StandardError => e
     SourceRun.create!(
       source: source,
