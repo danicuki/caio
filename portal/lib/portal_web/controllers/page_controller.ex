@@ -42,6 +42,7 @@ defmodule PortalWeb.PageController do
       [
         "User-agent: *",
         "Allow: /",
+        "Disallow: /auth/",
         "",
         "Sitemap: https://caio-jobs.com/sitemap.xml",
         sitemap_index_entries()

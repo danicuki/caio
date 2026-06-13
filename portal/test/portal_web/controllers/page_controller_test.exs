@@ -88,6 +88,7 @@ defmodule PortalWeb.PageControllerTest do
     conn = get(conn, "/robots.txt")
     response = text_response(conn, 200)
 
+    assert response =~ "Disallow: /auth/"
     assert response =~ "Sitemap: https://caio-jobs.com/sitemap.xml"
     assert response =~ "Sitemap: https://caio-jobs.com/sitemap-static.xml"
     assert response =~ "Sitemap: https://caio-jobs.com/sitemap-companies.xml"
