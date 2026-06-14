@@ -45,7 +45,9 @@ defmodule PortalWeb.Endpoint do
     cookie_key: "request_logger"
 
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: Application.compile_env(:portal, :endpoint_request_log, :info)
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],

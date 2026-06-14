@@ -22,5 +22,9 @@ config :portal, PortalWeb.Endpoint,
 # Do not print debug messages in production
 config :logger, level: :info
 
+# Keep error/warning logs in production, but do not emit one log line per HTTP
+# request. Search crawlers can generate very large syslog files otherwise.
+config :portal, :endpoint_request_log, false
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
